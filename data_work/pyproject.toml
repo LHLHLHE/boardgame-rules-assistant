@@ -1,0 +1,25 @@
+[project]
+name = "data-work"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "==3.11.*"
+dependencies = [
+    "fast-langdetect>=1.0.0",
+    "ipykernel>=7.1.0",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.1",
+    "pandas>=2.3.3",
+    "pandas-stubs~=2.3.3",
+    "pillow>=12.1.0",
+    "pip>=25.3",
+    "playwright>=1.57.0",
+    "pymupdf>=1.26.7",
+    "pytesseract>=0.3.13",
+    "seaborn>=0.13.2",
+]
+
+[dependency-groups]
+dev = [
+    "flake8>=7.3.0",
+]
