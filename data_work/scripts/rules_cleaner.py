@@ -27,6 +27,28 @@ RE_LIST_BULLET = re.compile(
     r")\s+",
     re.IGNORECASE,
 )
+RE_RIGHTS_PHRASE = re.compile(
+    r"(воспроизведени\w+.*без\s+разрешени\w+.*запрещен\w+|"
+    r"перепечатк\w+\s+и\s+публик\w+|"
+    r"without\s+permission|all\s+rights\s+reserved)",
+    re.IGNORECASE
+)
+
+RE_CREDITS_HEADING = re.compile(
+    r"^\s*(создател\w+|credits|credit|автор\w+|художник\w+|иллюстратор\w+|"
+    r"руководител\w+|организатор\w+|редактор\w+|перевод\w+|корректор\w+|"
+    r"русск\w+\s+издани\w+|published\s+by)\b",
+    re.IGNORECASE
+)
+RE_MARKETING_BORING = re.compile(
+    r"^\s*(производител\w+\s+игр|российск\w+\s+сеть\s+магазин\w+)\b",
+    re.IGNORECASE
+)
+RE_TRADEMARK = re.compile(
+    r"(товарн\w+\s+знак|trademark|registered\s+trademark|®|™)",
+    re.IGNORECASE
+)
+RE_COMPANY_FORM = re.compile(r"\b(ооо|llc|gmbh|inc\.?)\b", re.IGNORECASE)
 RE_SECTION_HEADING = re.compile(r"^\s*(раздел|глава|приложение)\b", re.IGNORECASE)
 RE_WORD_END_HYPHEN = re.compile(r"([A-Za-zА-Яа-яЁё]{2,})-\s*$")
 RE_WORD_START = re.compile(r"^[A-Za-zА-Яа-яЁё]{2,}")
@@ -58,6 +80,9 @@ class CleanConfig:
 
     drop_single_char_streaks: bool = True
     single_char_streak_min: int = 3
+
+    head_window_lines: int = 80
+    tail_window_lines: int = 200
 
 
 @dataclass
@@ -142,7 +167,6 @@ def clean_lines(lines: list[str], boilerplate: set[str] | None, cfg: CleanConfig
         return bool(boilerplate) and (s in boilerplate)
 
     single_char_streak = 0
-
     while i < len(lines):
         raw = lines[i]
         s = raw.strip()
@@ -161,13 +185,32 @@ def clean_lines(lines: list[str], boilerplate: set[str] | None, cfg: CleanConfig
         if cfg.remove_global_boilerplate and s and is_boiler(s):
             i += 1
             continue
-
         if s and (RE_PAGE_LINE.match(s) or RE_JUNK_LINE.match(s)):
             i += 1
             continue
 
-        line = RE_MANY_SPACES.sub(" ", raw).strip()
+        in_head = i < cfg.head_window_lines
+        in_tail = i >= max(0, len(lines) - cfg.tail_window_lines)
+        if (in_head or in_tail) and s and RE_CREDITS_HEADING.match(s):
+            i += 1
+            lim = 60
+            while i < len(lines) and lim > 0:
+                t = lines[i].strip()
+                if not t:
+                    break
+                if RE_SECTION_HEADING.match(t) or RE_LIST_BULLET.match(t):
+                    break
+                i += 1
+                lim -= 1
+            continue
 
+        has_rights = bool(RE_RIGHTS_PHRASE.search(s))
+        has_entity = bool(RE_COMPANY_FORM.search(s) or RE_TRADEMARK.search(s))
+        if s and 40 <= len(s) <= 400 and has_rights and (has_entity or in_tail or in_head):
+            i += 1
+            continue
+
+        line = RE_MANY_SPACES.sub(" ", raw).strip()
         if not line:
             if out and out[-1] != "":
                 out.append("")
