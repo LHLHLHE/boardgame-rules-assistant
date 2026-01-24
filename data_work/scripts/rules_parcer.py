@@ -29,17 +29,18 @@ HEADERS = {
     ),
 }
 
-DATA_WORK_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DATA_WORK_DIR = BASE_DIR / "data_work"
 
-ARTIFACTS_DIR = DATA_WORK_DIR / "artifacts/parser"
+ARTIFACTS_DIR = DATA_WORK_DIR / "artifacts" / "parser"
 LINKS_FILE_PATH = ARTIFACTS_DIR / "games_links.txt"
 FAILED_LINKS_FILE_PATH = ARTIFACTS_DIR / "failed_catalog_pages.txt"
 FAILED_RULES_LINKS_FILE_PATH = ARTIFACTS_DIR / "failed_rules_links.txt"
 SUCCESS_RULES_LINKS_FILE_PATH = ARTIFACTS_DIR / "success_rules_links.txt"
 
-RULES_INDEX_FILE_PATH = DATA_WORK_DIR / "metadata/rules_index.csv"
+RULES_INDEX_FILE_PATH = DATA_WORK_DIR / "metadata" / "rules_index.csv"
 
-RULES_FILES_DIR = DATA_WORK_DIR / "data/rules_files"
+RULES_FILES_DIR = BASE_DIR / "data" / "rules_files"
 
 MAX_CONCURRENCY = 4
 MAX_RETRIES = 3

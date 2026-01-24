@@ -17,18 +17,19 @@ logging.basicConfig(
 logging.getLogger("fast-langdetect").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
-DATA_WORK_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DATA_WORK_DIR = BASE_DIR / "data_work"
 
 METADATA_DIR = DATA_WORK_DIR / "metadata"
 RULES_INDEX_FILE_PATH = METADATA_DIR / "rules_index.csv"
 DOCS_CSV_PATH = METADATA_DIR / "docs.csv"
 GAME_DOCS_CSV_PATH = METADATA_DIR / "game_docs.csv"
 
-DATA_DIR = DATA_WORK_DIR / "data"
+DATA_DIR = BASE_DIR / "data"
 RULES_FILES_DIR = DATA_DIR / "rules_files"
 TEXTS_DIR = DATA_DIR / "rules_texts"
 
-DEFECTIVE_DIR = DATA_WORK_DIR / "artifacts/text_extractor/defective_texts"
+DEFECTIVE_DIR = DATA_WORK_DIR / "artifacts" / "text_extractor" / "defective_texts"
 FAILED_TEXT_LINKS_PATH = DEFECTIVE_DIR / "failed_rules_text_links.txt"
 TOO_SHORT_PATH = DEFECTIVE_DIR / "too_short.txt"
 LOW_LETTER_RATIO_PATH = DEFECTIVE_DIR / "low_letter_ratio.txt"
@@ -233,7 +234,7 @@ def build_rules_text_indices() -> None:
                     "doc_sha256": doc_sha256,
                     "pdf_filename": pdf_filename,
                     "pdf_url": pdf_url,
-                    "text_path": str(text_path.relative_to(DATA_WORK_DIR)).replace("\\", "/"),
+                    "text_path": str(text_path.relative_to(BASE_DIR)).replace("\\", "/"),
                     "primary_title": game_title,
                     "lang": lang,
                 }

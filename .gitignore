@@ -209,4 +209,4 @@ __marimo__/
 # MacOS
 .DS_Store
 
-data_work/data/**
+data/

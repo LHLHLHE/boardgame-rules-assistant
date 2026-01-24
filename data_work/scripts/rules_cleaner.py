@@ -56,9 +56,10 @@ RE_ONE_LETTER_LINE = re.compile(r"^\s*[A-Za-zА-Яа-яЁё]\s*$")
 RE_SYMBOLS_LINE = re.compile(r"^\s*[^A-Za-zА-Яа-яЁё0-9]{6,}\s*$")
 RE_PAR_SPLIT = re.compile(r"\n\s*\n+")
 
-DATA_WORK_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DATA_WORK_DIR = BASE_DIR / "data_work"
 
-DATA_DIR = DATA_WORK_DIR / "data"
+DATA_DIR = BASE_DIR / "data"
 TEXTS_DIR = DATA_DIR / "rules_texts"
 CLEANED_TEXTS_GOOD_DIR = DATA_DIR / "rules_texts_cleaned_good"
 CLEANED_TEXTS_QUARANTINE_DIR = DATA_DIR / "rules_texts_cleaned_quarantine"
@@ -475,7 +476,7 @@ def main():
             rows.append({
                 "raw_doc_sha256": sha,
                 "clean_sha256": res.get("clean_sha256", ""),
-                "clean_text_path": str(out_path.relative_to(DATA_WORK_DIR)).replace("\\", "/"),
+                "clean_text_path": str(out_path.relative_to(BASE_DIR)).replace("\\", "/"),
                 "lang": lang,
                 "pdf_filename": (row.get("pdf_filename") or "").strip(),
                 "pdf_url": (row.get("pdf_url") or "").strip(),
