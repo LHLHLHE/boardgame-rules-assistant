@@ -56,8 +56,8 @@ RE_ONE_LETTER_LINE = re.compile(r"^\s*[A-Za-zА-Яа-яЁё]\s*$")
 RE_SYMBOLS_LINE = re.compile(r"^\s*[^A-Za-zА-Яа-яЁё0-9]{6,}\s*$")
 RE_PAR_SPLIT = re.compile(r"\n\s*\n+")
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_WORK_DIR = BASE_DIR / "data_work"
+BASE_DIR = Path(__file__).resolve().parents[3]
+DATA_WORK_DIR = BASE_DIR / "research" / "data_work"
 
 DATA_DIR = BASE_DIR / "data"
 TEXTS_DIR = DATA_DIR / "rules_texts"

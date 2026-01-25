@@ -17,8 +17,8 @@ logging.basicConfig(
 logging.getLogger("fast-langdetect").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_WORK_DIR = BASE_DIR / "data_work"
+BASE_DIR = Path(__file__).resolve().parents[3]
+DATA_WORK_DIR = BASE_DIR / "research" / "data_work"
 
 METADATA_DIR = DATA_WORK_DIR / "metadata"
 RULES_INDEX_FILE_PATH = METADATA_DIR / "rules_index.csv"

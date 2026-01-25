@@ -29,8 +29,8 @@ HEADERS = {
     ),
 }
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_WORK_DIR = BASE_DIR / "data_work"
+BASE_DIR = Path(__file__).resolve().parents[3]
+DATA_WORK_DIR = BASE_DIR / "research" / "data_work"
 
 ARTIFACTS_DIR = DATA_WORK_DIR / "artifacts" / "parser"
 LINKS_FILE_PATH = ARTIFACTS_DIR / "games_links.txt"
