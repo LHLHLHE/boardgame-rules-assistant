@@ -210,3 +210,6 @@ __marimo__/
 .DS_Store
 
 data/
+
+# Qdrant storage
+qdrant_storage/

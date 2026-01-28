@@ -7,6 +7,11 @@ requires-python = "==3.11.*"
 dependencies = [
     "fast-langdetect>=1.0.0",
     "ipykernel>=7.1.0",
+    "llama-index-core>=0.14.13",
+    "llama-index-embeddings-huggingface>=0.6.1",
+    "llama-index-llms-ollama>=0.9.1",
+    "llama-index-llms-openai>=0.6.15",
+    "llama-index-vector-stores-qdrant>=0.9.1",
     "matplotlib>=3.10.8",
     "numpy>=2.4.1",
     "pandas>=2.3.3",
@@ -16,6 +21,7 @@ dependencies = [
     "playwright>=1.57.0",
     "pymupdf>=1.26.7",
     "pytesseract>=0.3.13",
+    "qdrant-client>=1.16.2",
     "seaborn>=0.13.2",
     "spacy>=3.8.11",
 ]
