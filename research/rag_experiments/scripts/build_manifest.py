@@ -1,20 +1,10 @@
 from pathlib import Path
-import hashlib
+
 import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 METADATA_DIR = BASE_DIR / "research" / "data_work" / "metadata"
 MANIFEST_PATH = BASE_DIR / "manifests" / "index_manifest.csv"
-
-
-def create_doc_id(row):
-    raw_doc_sha = str(row["raw_doc_sha256"])
-    game_url = row.get("game_url") if "game_url" in row else None
-    if pd.isna(game_url) or game_url == "" or game_url is None:
-        return raw_doc_sha
-
-    game_url_hash = hashlib.sha256(str(game_url).encode()).hexdigest()[:8]
-    return f"{raw_doc_sha}_{game_url_hash}"
 
 
 def build_index_manifest():
@@ -69,10 +59,6 @@ def build_index_manifest():
         validate="many_to_one",
     )
 
-    if "game_url" not in merged.columns:
-        print("Warning: поле game_url не найдено. Используется raw_doc_sha256 в качестве doc_id.")
-        merged["game_url"] = None
-
     lang_series = (
         merged["lang"]
         if "lang" in merged.columns
@@ -80,18 +66,13 @@ def build_index_manifest():
     ).fillna("unknown")
 
     result = pd.DataFrame({
-        "doc_id": merged.apply(create_doc_id, axis=1),
+        "doc_id": merged["raw_doc_sha256"],
         "raw_doc_sha256": merged["raw_doc_sha256"],
         "clean_sha256": merged["clean_sha256"],
         "game_title": merged["title"].fillna(merged.get("primary_title", "")).fillna(""),
         "lang": lang_series,
         "text_path": merged["clean_text_path"],
     })
-    
-    duplicates = result[result.duplicated(subset=["doc_id"], keep=False)]
-    if len(duplicates) > 0:
-        print(f"Warning: Найдено дубликатов doc_id: {len(duplicates)}")
-        print(duplicates[["doc_id", "raw_doc_sha256", "game_title"]].head(10))
 
     Path(MANIFEST_PATH).parent.mkdir(parents=True, exist_ok=True)
     result.to_csv(MANIFEST_PATH, index=False)

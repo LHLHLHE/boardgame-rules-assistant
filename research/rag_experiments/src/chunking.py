@@ -9,10 +9,10 @@ from src.config import MANIFEST_PATH, BASE_DIR, CHUNK_SIZE, CHUNK_OVERLAP
 
 def load_manifest() -> pd.DataFrame:
     """
-    Load and aggregate manifest by doc_id.
+    Load and aggregate manifest by doc_id (raw_doc_sha256).
 
-    One document can be linked to multiple games, so we aggregate
-    game_titles into a list to avoid duplicate indexing.
+    One doc_id can have multiple rows (one per game). We aggregate
+    game_titles into a list so each document is loaded once with all its games.
     """
     df = pd.read_csv(MANIFEST_PATH)
     aggregated = df.groupby("doc_id").agg({
