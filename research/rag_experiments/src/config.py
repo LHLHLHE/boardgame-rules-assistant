@@ -14,7 +14,7 @@ EMBEDDING_DIM = 768
 
 # Chunking settings
 CHUNK_SIZE = 512  # tokens
-CHUNK_OVERLAP = 50  # tokens
+CHUNK_OVERLAP = 80  # tokens
 
 # Retrieval settings
 TOP_K = 5
@@ -22,5 +22,5 @@ TOP_K = 5
 # LLM settings
 LLM_PROVIDER = "ollama"  # "ollama" or "openai"
 LLM_MODEL = "qwen2.5:1.5b"
-LLM_TEMPERATURE = 0.1  # Lower temperature for more factual answers
+LLM_TEMPERATURE = 0.0
 LLM_MAX_TOKENS = 512  # Max tokens for OpenAI (not used for Ollama)

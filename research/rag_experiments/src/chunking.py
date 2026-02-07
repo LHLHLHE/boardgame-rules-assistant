@@ -7,12 +7,15 @@ from llama_index.core.node_parser import SentenceSplitter
 from src.config import MANIFEST_PATH, BASE_DIR, CHUNK_SIZE, CHUNK_OVERLAP
 
 
-def load_manifest() -> pd.DataFrame:
+def load_manifest(lang: str | None = "ru") -> pd.DataFrame:
     """
     Load and aggregate manifest by doc_id (raw_doc_sha256).
 
     One doc_id can have multiple rows (one per game). We aggregate
     game_titles into a list so each document is loaded once with all its games.
+
+    If lang is set (default "ru"), only documents in that language are returned.
+    Pass lang=None to load all languages.
     """
     df = pd.read_csv(MANIFEST_PATH)
     aggregated = df.groupby("doc_id").agg({
@@ -20,11 +23,17 @@ def load_manifest() -> pd.DataFrame:
         "lang": "first",
         "text_path": "first",
     }).reset_index()
+    if lang is not None:
+        aggregated = aggregated[aggregated["lang"] == lang]
     return aggregated
 
 
-def load_documents(batch_size: int = 100) -> Iterator[list[Document]]:
-    manifest = load_manifest()
+def load_documents(batch_size: int = 100, lang: str | None = "ru") -> Iterator[list[Document]]:
+    """
+    Load documents from manifest. By default only Russian (lang="ru") rules are loaded.
+    Pass lang=None to load all languages.
+    """
+    manifest = load_manifest(lang=lang)
     batch: list[Document] = []
 
     for _, row in manifest.iterrows():

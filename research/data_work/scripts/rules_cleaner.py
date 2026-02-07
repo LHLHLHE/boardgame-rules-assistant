@@ -18,7 +18,10 @@ RE_PAGE_LINE = re.compile(
     r"^\s*(стр\.?|страниц[аы]?|page)\s*\d+(\s*[\/\-]\s*\d+)?\s*$",
     re.IGNORECASE,
 )
+RE_PAGE_DASH = re.compile(r"^\s*[–—\-]\s*\d+\s*[–—\-]?\s*$")
 RE_JUNK_LINE = re.compile(r"^\s*([_\-–—=•\*]{3,}|\d{1,4})\s*$")
+RE_DOWNLOAD_LINE = re.compile(r"^\s*Правила игры скачаны с\s+\S+\s*$", re.IGNORECASE)
+RE_PUNCT_ONLY_LINE = re.compile(r"^\s*[.,;:!?•*\-–—=\s]{1,10}\s*$")
 RE_LIST_BULLET = re.compile(
     r"^\s*("
     r"(\d+(\.\d+){0,5}[.)])|"
@@ -55,6 +58,16 @@ RE_WORD_START = re.compile(r"^[A-Za-zА-Яа-яЁё]{2,}")
 RE_ONE_LETTER_LINE = re.compile(r"^\s*[A-Za-zА-Яа-яЁё]\s*$")
 RE_SYMBOLS_LINE = re.compile(r"^\s*[^A-Za-zА-Яа-яЁё0-9]{6,}\s*$")
 RE_PAR_SPLIT = re.compile(r"\n\s*\n+")
+RE_SOFT_HYPHEN_NEWLINE = re.compile(r"\u00AD\s*\n\s*")
+RE_REPEATED_PHRASE = re.compile(r"(\S+(?:\s+\S+)+?) \1")
+
+RE_HEADER_PHASE_STEP = re.compile(r"^\s*(ФАЗА|ШАГ|PHASE|STEP)\s+\d", re.IGNORECASE)
+RE_HEADER_RULES_SECTION = re.compile(
+    r"^\s*(Подготовка к игре|Компоненты\b|Игровой процесс|Конец игры|"
+    r"Подсчёт очков|Описание\b|Правила игры|Setup\b|Components\b|"
+    r"Gameplay\b|End of game\b|Scoring\b)\s*:?\s*$",
+    re.IGNORECASE
+)
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 DATA_WORK_DIR = BASE_DIR / "research" / "data_work"
@@ -97,9 +110,20 @@ class QualityConfig:
     max_bad_paragraph_ratio: float = 0.4
 
 
+def collapse_repeated_phrase(line: str) -> str:
+    if not line.strip():
+        return line
+    prev = None
+    while prev != line:
+        prev = line
+        line = RE_REPEATED_PHRASE.sub(r"\1", line)
+    return line
+
+
 def normalize_text(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = unicodedata.normalize("NFKC", text)
+    text = RE_SOFT_HYPHEN_NEWLINE.sub("", text)
     text = (
         text
         .replace("\u00AD", "")
@@ -186,12 +210,23 @@ def clean_lines(lines: list[str], boilerplate: set[str] | None, cfg: CleanConfig
         if cfg.remove_global_boilerplate and s and is_boiler(s):
             i += 1
             continue
-        if s and (RE_PAGE_LINE.match(s) or RE_JUNK_LINE.match(s)):
+        if s and (
+            RE_PAGE_LINE.match(s)
+            or RE_PAGE_DASH.match(s)
+            or RE_JUNK_LINE.match(s)
+            or RE_PUNCT_ONLY_LINE.match(s)
+        ):
             i += 1
             continue
 
         in_head = i < cfg.head_window_lines
         in_tail = i >= max(0, len(lines) - cfg.tail_window_lines)
+        if (in_head or in_tail) and s and RE_DOWNLOAD_LINE.match(s):
+            i += 1
+            continue
+        if (in_head or in_tail) and s and RE_MARKETING_BORING.match(s):
+            i += 1
+            continue
         if (in_head or in_tail) and s and RE_CREDITS_HEADING.match(s):
             i += 1
             lim = 60
@@ -258,11 +293,41 @@ def clean_lines(lines: list[str], boilerplate: set[str] | None, cfg: CleanConfig
     for line in merged:
         if line == "" and (not final_lines or final_lines[-1] == ""):
             continue
+        if line:
+            line = collapse_repeated_phrase(line)
+        if line and final_lines and final_lines[-1] == line:
+            continue
         final_lines.append(line)
 
     text = "\n".join(final_lines).strip() + "\n"
     text = RE_MANY_SPACES.sub(" ", text)
     return text
+
+
+def is_section_header_line(line: str) -> bool:
+    s = line.strip()
+    if not s:
+        return False
+    if RE_HEADER_PHASE_STEP.match(s):
+        return True
+    if RE_HEADER_RULES_SECTION.match(s):
+        return True
+    if RE_SECTION_HEADING.match(s):
+        return True
+    return False
+
+
+def ensure_paragraph_break_before_headers(text: str) -> str:
+    lines = text.split("\n")
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if s and is_section_header_line(s):
+            prev = lines[i - 1].strip() if i > 0 else ""
+            if prev and out and out[-1].strip():
+                out.append("")
+        out.append(line)
+    return "\n".join(out).strip() + "\n" if out else ""
 
 
 def score_paragraph(p: str, qcfg: QualityConfig) -> tuple[bool, str]:
@@ -287,6 +352,10 @@ def filter_by_quality(text: str, qcfg: QualityConfig) -> tuple[str, dict]:
     reasons = Counter()
 
     for p in paras:
+        if is_section_header_line(p):
+            kept.append(p)
+            reasons["header_kept"] = reasons.get("header_kept", 0) + 1
+            continue
         ok, reason = score_paragraph(p, qcfg)
         reasons[reason] += 1
         if ok:
@@ -350,6 +419,7 @@ def process_one(
     raw_norm = normalize_text(raw)
 
     cleaned_stage1 = clean_lines(raw_norm.split("\n"), boilerplate=boilerplate, cfg=cfg)
+    cleaned_stage1 = ensure_paragraph_break_before_headers(cleaned_stage1)
     cleaned_final, qstats = filter_by_quality(cleaned_stage1, qcfg)
 
     survival_ratio = len(cleaned_final) / max(1, len(raw_norm))
@@ -499,7 +569,6 @@ def main():
             if done % 200 == 0:
                 print(f"Processed {done}/{total}")
 
-    # stable order in report
     rows.sort(key=lambda r: r["raw_doc_sha256"])
 
     report = CLEANED_TEXTS_REPORT_PATH
