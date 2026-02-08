@@ -46,7 +46,7 @@ def load_documents(batch_size: int = 100, lang: str | None = "ru") -> Iterator[l
         doc = Document(
             text=text_path.read_text(encoding="utf-8"),
             metadata={
-                "doc_id": row["doc_id"],
+                "source_doc_id": row["doc_id"],
                 "game_titles": row["game_title"],
                 "lang": row["lang"],
                 "source_file": str(text_path.name),

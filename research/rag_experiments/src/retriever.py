@@ -68,7 +68,7 @@ class Retriever:
                 RetrievalResult(
                     text=node.node.text,
                     score=node.score,
-                    doc_id=metadata.get("doc_id", ""),
+                    doc_id=metadata.get("source_doc_id") or metadata.get("doc_id", ""),
                     game_titles=game_titles,
                     lang=metadata.get("lang", ""),
                     source_file=metadata.get("source_file", ""),
