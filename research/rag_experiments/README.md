@@ -40,7 +40,7 @@
 
 ### Индексация (`index_documents.py`)
 
-Читает очищенные тексты из `data/rules_texts_cleaned_good/` и манифест из `manifests/index_manifest.csv`. Дальше:
+Читает очищенные тексты из `data/rules_texts_cleaned_good/` и манифест из `manifests/index_manifest.csv` (На текущем этапе индексация выполняется только для документов с lang=ru). Дальше:
 
 1. Загрузка документов и чанкинг.
 2. Эмбеддинги.
@@ -84,3 +84,4 @@
 - `game_titles` - список названий игр.
 - `lang` - язык (ru/en).
 - `source_file` - путь к файлу в `data/rules_texts_cleaned_good/`.
+
