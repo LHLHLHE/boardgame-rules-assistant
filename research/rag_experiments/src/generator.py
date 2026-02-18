@@ -1,9 +1,8 @@
+from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.core.llms import LLM
 from llama_index.llms.ollama import Ollama
-from llama_index.llms.openai import OpenAI
-from llama_index.core.base.llms.types import ChatMessage, MessageRole
+from omegaconf import DictConfig, OmegaConf
 
-from src.config import LLM_MODEL, LLM_PROVIDER, LLM_TEMPERATURE, LLM_MAX_TOKENS
 from src.retriever import Retriever
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -11,7 +10,8 @@ DEFAULT_SYSTEM_PROMPT = (
     "ВАЖНО: Используй ТОЛЬКО информацию из предоставленного контекста. "
     "НЕ выдумывай детали, которых нет в контексте. "
     "НЕ добавляй информацию из своих знаний, если её нет в контексте. "
-    "Если в контексте нет ответа на вопрос, честно скажи: 'В предоставленном контексте нет информации об этом.' "
+    "Если в контексте нет ответа на вопрос, честно скажи: "
+    "'В предоставленном контексте нет информации об этом.' "
     "Отвечай кратко, точно и по делу на русском языке, цитируя факты из контекста."
 )
 NO_CONTEXT_SYSTEM_PROMPT = (
@@ -29,60 +29,84 @@ USER_PROMPT_TEMPLATE = """
 ОТВЕТ (используй только факты из контекста выше):"""
 
 
-class Generator:
-    """
-    Simple generator for baseline RAG.
-    
-    Uses retrieved context to generate answers.
-    """
+def create_eval_llm(cfg: DictConfig, temperature: float | None = None) -> LLM:
+    """Создаёт LlamaIndex LLM из eval_llm конфига (генерация датасета / валидация)."""
+    default_temp = float(OmegaConf.select(cfg, "eval_llm.temperature", default=0.0))
+    temp = temperature if temperature is not None else default_temp
+    provider = str(OmegaConf.select(cfg, "eval_llm.provider", default="ollama")).lower()
+    if provider != "ollama":
+        raise ValueError(
+            f"Unknown EVAL_LLM_PROVIDER: {provider}. Supported: 'ollama'"
+        )
+    base_url = str(OmegaConf.select(cfg, "llm.ollama_base_url", default="http://localhost:11434"))
+    model = str(OmegaConf.select(cfg, "eval_llm.model", default="qwen2.5:7b-instruct"))
+    max_tokens = int(OmegaConf.select(cfg, "eval_llm.max_tokens", default=512))
+    return Ollama(
+        model=model,
+        base_url=base_url,
+        temperature=temp,
+        request_timeout=60.0,
+        additional_kwargs={"num_predict": max_tokens},
+    )
 
-    def __init__(self, llm: LLM | None = None, retriever: Retriever | None = None):
+
+class Generator:
+    """Генератор для RAG."""
+
+    def __init__(
+        self,
+        cfg: DictConfig,
+        llm: LLM | None = None,
+        retriever: Retriever | None = None,
+    ):
         """
-        Initialize generator.
-        
         Args:
-            llm: Optional pre-initialized LLM. If None, creates based on config.
-            retriever: Optional retriever instance. If None, creates new one.
+            cfg: Hydra-конфиг.
+            llm: Опционально прединициализированный LLM. Если None - создаётся из конфига.
+            retriever: Опциональный retriever. Если None - создаётся новый.
         """
+        self.cfg = cfg
         self.llm = llm or self._create_llm()
-        self.retriever = retriever or Retriever()
+        self.retriever = retriever or Retriever(cfg)
 
     def _create_llm(self) -> LLM:
-        provider = LLM_PROVIDER.lower()
-        if provider == "ollama":
-            return Ollama(
-                model=LLM_MODEL,
-                temperature=LLM_TEMPERATURE,
-                request_timeout=60.0,
-            )
-        elif provider == "openai":
-            return OpenAI(
-                model=LLM_MODEL,
-                temperature=LLM_TEMPERATURE,
-                max_tokens=LLM_MAX_TOKENS,
-            )
-        else:
+        provider = str(OmegaConf.select(self.cfg, "llm.provider", default="ollama")).lower()
+        if provider != "ollama":
             raise ValueError(
-                f"Unknown LLM provider: {LLM_PROVIDER}. "
-                "Supported: 'ollama', 'openai'"
+                f"Unknown LLM provider: {provider}. Supported: 'ollama'"
             )
+        model = str(OmegaConf.select(self.cfg, "llm.model", default="qwen2.5:1.5b"))
+        base_url = str(OmegaConf.select(
+            self.cfg,
+            "llm.ollama_base_url",
+            default="http://localhost:11434"
+        ))
+        temperature = float(OmegaConf.select(self.cfg, "llm.temperature", default=0.0))
+        max_tokens = int(OmegaConf.select(self.cfg, "llm.max_tokens", default=512))
+        return Ollama(
+            model=model,
+            base_url=base_url,
+            temperature=temperature,
+            request_timeout=60.0,
+            additional_kwargs={"num_predict": max_tokens},
+        )
 
     def generate(
         self,
         query: str,
         top_k: int | None = None,
         system_prompt: str | None = None,
-    ) -> str:
+    ) -> tuple[str, str]:
         """
-        Generate answer using RAG.
-        
+        Генерирует ответ с помощью RAG.
+
         Args:
-            query: User question
-            top_k: Number of chunks to retrieve (default: config.TOP_K)
-            system_prompt: Optional custom system prompt
-            
+            query: Вопрос пользователя.
+            top_k: Число чанков для извлечения (по умолчанию из config).
+            system_prompt: Опциональный кастомный system prompt.
+
         Returns:
-            Generated answer
+            Кортеж (ответ, контекст, переданный в LLM).
         """
         context = self.retriever.retrieve_with_context(query, top_k=top_k)
         if system_prompt is None:
@@ -93,19 +117,15 @@ class Generator:
             ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
             ChatMessage(role=MessageRole.USER, content=prompt),
         ]
-        
         response = self.llm.chat(messages)
-        return response.message.content
+        return (response.message.content or "", context)
 
     def generate_without_context(
         self,
         query: str,
         system_prompt: str | None = None,
     ) -> str:
-        """
-        Generate answer using only the LLM, without retrieved context.
-        Useful for comparing RAG vs vanilla LLM (ablation).
-        """
+        """Генерирует ответ только LLM без контекста (ablation: RAG vs vanilla LLM)."""
         if system_prompt is None:
             system_prompt = NO_CONTEXT_SYSTEM_PROMPT
         messages = [
@@ -122,15 +142,15 @@ class Generator:
         system_prompt: str | None = None,
     ):
         """
-        Generate answer with streaming (yields tokens).
+        Генерирует ответ стримингом.
 
         Args:
-            query: User question
-            top_k: Number of chunks to retrieve
-            system_prompt: Optional custom system prompt
+            query: Вопрос пользователя.
+            top_k: Число чанков для извлечения.
+            system_prompt: Опциональный system prompt.
 
         Yields:
-            Token strings as they are generated
+            Токены по мере генерации.
         """
         context = self.retriever.retrieve_with_context(query, top_k=top_k)
 

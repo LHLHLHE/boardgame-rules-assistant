@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 from llama_index.core import VectorStoreIndex
 from llama_index.core.schema import NodeWithScore
+from omegaconf import DictConfig, OmegaConf
 
-from src.config import TOP_K
 from src.indexer import load_index
 
 
@@ -18,22 +18,19 @@ class RetrievalResult:
 
 
 class Retriever:
-    """
-    Simple retriever for baseline RAG.
+    """Ретривер для baseline RAG."""
 
-    Uses cosine similarity search in Qdrant.
-    """
-
-    def __init__(self, index: VectorStoreIndex | None = None):
+    def __init__(self, cfg: DictConfig, index: VectorStoreIndex | None = None):
         """
-        Initialize retriever.
-
         Args:
-            index: Optional pre-loaded index. If None, loads from Qdrant.
+            cfg: Hydra-конфиг.
+            index: Опционально предзагруженный индекс. Если None - загружается из Qdrant.
         """
-        self.index = index or load_index()
-        self._current_top_k = TOP_K
-        self._retriever = self.index.as_retriever(similarity_top_k=TOP_K)
+        self.cfg = cfg
+        self.index = index or load_index(cfg)
+        top_k = int(OmegaConf.select(cfg, "retrieval.top_k", default=5))
+        self._current_top_k = top_k
+        self._retriever = self.index.as_retriever(similarity_top_k=top_k)
 
     def retrieve(
         self,
@@ -41,17 +38,17 @@ class Retriever:
         top_k: int | None = None,
     ) -> list[RetrievalResult]:
         """
-        Retrieve relevant chunks for a query.
+        Получает релевантные чанки для запроса.
 
         Args:
-            query: User question
-            top_k: Number of results to return (default: config.TOP_K)
+            query: Вопрос пользователя.
+            top_k: Число результатов (по умолчанию из config retrieval.top_k).
 
         Returns:
-            List of RetrievalResult objects
+            Список RetrievalResult.
         """
         if top_k is None:
-            top_k = TOP_K
+            top_k = int(OmegaConf.select(self.cfg, "retrieval.top_k", default=5))
         if top_k != self._current_top_k:
             self._retriever = self.index.as_retriever(similarity_top_k=top_k)
             self._current_top_k = top_k
@@ -83,17 +80,17 @@ class Retriever:
         top_k: int | None = None,
     ) -> str:
         """
-        Retrieve and format context for LLM.
+        Получает и форматирует контекст для LLM.
 
         Args:
-            query: User question
-            top_k: Number of results
+            query: Вопрос пользователя.
+            top_k: Число результатов.
 
         Returns:
-            Formatted context string for LLM prompt
+            Отформатированная строка контекста для промпта LLM.
         """
         if top_k is None:
-            top_k = TOP_K
+            top_k = int(OmegaConf.select(self.cfg, "retrieval.top_k", default=5))
         if top_k != self._current_top_k:
             self._retriever = self.index.as_retriever(similarity_top_k=top_k)
             self._current_top_k = top_k

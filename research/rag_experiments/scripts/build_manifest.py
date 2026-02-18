@@ -1,17 +1,17 @@
-from pathlib import Path
-
 import pandas as pd
 
-BASE_DIR = Path(__file__).resolve().parents[3]
-METADATA_DIR = BASE_DIR / "research" / "data_work" / "metadata"
-MANIFEST_PATH = BASE_DIR / "manifests" / "index_manifest.csv"
+from src.config import get_cfg, paths_from_cfg
 
 
-def build_index_manifest():
-    docs = pd.read_csv(METADATA_DIR / "docs.csv")
-    game_docs = pd.read_csv(METADATA_DIR / "game_docs.csv")
-    rules_index = pd.read_csv(METADATA_DIR / "rules_index.csv")
-    cleaned_report = pd.read_csv(METADATA_DIR / "rules_texts_cleaned_report.csv")
+def build_index_manifest() -> None:
+    cfg = get_cfg()
+    paths = paths_from_cfg(cfg)
+    metadata_dir = paths["base_dir"] / "research" / "data_work" / "metadata"
+
+    docs = pd.read_csv(metadata_dir / "docs.csv")
+    game_docs = pd.read_csv(metadata_dir / "game_docs.csv")
+    rules_index = pd.read_csv(metadata_dir / "rules_index.csv")
+    cleaned_report = pd.read_csv(metadata_dir / "rules_texts_cleaned_report.csv")
 
     rep_good = cleaned_report[cleaned_report["quarantine"] == 0].copy()
 
@@ -74,8 +74,10 @@ def build_index_manifest():
         "text_path": merged["clean_text_path"],
     })
 
-    Path(MANIFEST_PATH).parent.mkdir(parents=True, exist_ok=True)
-    result.to_csv(MANIFEST_PATH, index=False)
+    manifest_path = paths["manifest_path"]
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    result.to_csv(manifest_path, index=False)
+
 
 if __name__ == "__main__":
     build_index_manifest()

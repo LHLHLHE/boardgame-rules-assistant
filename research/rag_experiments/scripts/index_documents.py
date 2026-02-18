@@ -1,39 +1,22 @@
-import argparse
-import sys
-from pathlib import Path
+from fire import Fire
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
+from src.config import get_cfg
 from src.indexer import index_documents
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Index boardgame rules into Qdrant"
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=100,
-        help="Number of documents to process at once (default: 100)",
-    )
-    parser.add_argument(
-        "--recreate",
-        action="store_true",
-        help="Delete and recreate the collection before indexing",
-    )
-    args = parser.parse_args()
-
+def main(
+    batch_size: int = 100,
+    recreate: bool = False,
+) -> None:
+    """Индексирует правила настольных игр в Qdrant."""
+    cfg = get_cfg()
     print("Starting document indexing...")
-    print(f"  Batch size: {args.batch_size}")
-    print(f"  Recreate collection: {args.recreate}")
+    print(f"  Batch size: {batch_size}")
+    print(f"  Recreate collection: {recreate}")
     print()
 
-    index_documents(
-        batch_size=args.batch_size,
-        recreate_collection=args.recreate,
-    )
+    index_documents(cfg, batch_size=batch_size, recreate_collection=recreate)
 
 
 if __name__ == "__main__":
-    main()
+    Fire(main)

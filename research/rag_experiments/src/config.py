@@ -1,26 +1,39 @@
 from pathlib import Path
 
+import torch
+from hydra import compose, initialize_config_dir
+from omegaconf import DictConfig, OmegaConf
+
+HYDRA_CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
 BASE_DIR = Path(__file__).resolve().parents[3]
-DATA_DIR = BASE_DIR / "data" / "rules_texts_cleaned_good"
-MANIFEST_PATH = BASE_DIR / "manifests" / "index_manifest.csv"
+RAG_EXP_DIR = Path(__file__).resolve().parents[1]
 
-# Qdrant
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
-COLLECTION_NAME = "boardgame_rules"
 
-EMBEDDING_MODEL = "intfloat/multilingual-e5-base"
-EMBEDDING_DIM = 768
+def get_device() -> str:
+    if torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
 
-# Chunking settings
-CHUNK_SIZE = 512  # tokens
-CHUNK_OVERLAP = 80  # tokens
 
-# Retrieval settings
-TOP_K = 5
+def get_cfg(overrides: list[str] | None = None) -> DictConfig:
+    with initialize_config_dir(version_base=None, config_dir=str(HYDRA_CONFIG_DIR)):
+        return compose(config_name="config", overrides=list(overrides or []))
 
-# LLM settings
-LLM_PROVIDER = "ollama"  # "ollama" or "openai"
-LLM_MODEL = "qwen2.5:1.5b"
-LLM_TEMPERATURE = 0.0
-LLM_MAX_TOKENS = 512  # Max tokens for OpenAI (not used for Ollama)
+
+def get_collection_name(cfg: DictConfig) -> str:
+    return str(OmegaConf.select(cfg, "qdrant.collection_name", default="boardgame_rules"))
+
+
+def paths_from_cfg(cfg: DictConfig) -> dict[str, Path]:
+    manifest = OmegaConf.select(cfg, "data.manifest_path", default="manifests/index_manifest.csv")
+    data_dir = OmegaConf.select(cfg, "data.data_dir", default="data/rules_texts_cleaned_good")
+    eval_dir = OmegaConf.select(cfg, "data.eval_datasets_dir", default="data/eval")
+    return {
+        "base_dir": BASE_DIR,
+        "rag_dir": RAG_EXP_DIR,
+        "manifest_path": BASE_DIR / str(manifest),
+        "data_dir": BASE_DIR / str(data_dir),
+        "eval_datasets_dir": RAG_EXP_DIR / str(eval_dir),
+    }
