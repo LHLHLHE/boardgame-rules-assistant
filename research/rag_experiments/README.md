@@ -54,7 +54,7 @@
 
 Запускает оценку ретривера и полного RAG-пайплайна по QA-датасету (локальный JSONL или Hugging Face). Метрики:
 
-- **Ретривер:** recall@k, precision@k, NDCG@k, hit rate.
+- **Ретривер:** recall@k, precision@k, MAP@K, NDCG@k, hit rate.
 - **Пайплайн:** chrF++, ROUGE, семантическая близость, при включённом флаге - LLM-as-judge (faithfulness, relevance, correctness).
 
 Запуск: `python -m scripts.run_evaluation`. В ноутбуке `03_baseline_evaluation.ipynb` используется `run_full_evaluation` из `src/eval`.
