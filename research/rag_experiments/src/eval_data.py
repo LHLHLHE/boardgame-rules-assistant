@@ -309,7 +309,7 @@ def load_qa_dataset_from_jsonl(path: str | Path) -> list[dict[str, Any]]:
 
 def load_qa_dataset_from_hf(
     repo_id: str,
-    filename: str = "eval_dataset.jsonl",
+    filename: str = "boardgame_rules_qa_dataset_ru.jsonl",
     repo_type: str = "dataset",
 ) -> list[dict[str, Any]]:
     """

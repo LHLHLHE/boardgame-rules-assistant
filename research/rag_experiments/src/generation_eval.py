@@ -110,7 +110,8 @@ class GenerationEvaluator:
             self._semantic_embed_model = HuggingFaceEmbedding(**kwargs)
         return self._semantic_embed_model
 
-    def _parse_llm_judge_score(self, text: str) -> float | None:
+    def _parse_llm_judge_score(self, text: str) -> int | None:
+        """Возвращает сырую оценку судьи 1–5 или None."""
         if not text:
             return None
 
@@ -132,7 +133,7 @@ class GenerationEvaluator:
         if not (1 <= score <= 5):
             return None
 
-        return (score - 1) / 4.0
+        return score
 
     def _llm_judge_one(
         self,
@@ -141,8 +142,8 @@ class GenerationEvaluator:
         sample_idx: int | None = None,
         metric: str | None = None,
         n_trials: int = 1
-    ) -> float | None:
-        scores: list[float] = []
+    ) -> int | None:
+        scores: list[int] = []
         for _ in range(max(1, int(n_trials))):
             try:
                 messages = [ChatMessage(role=MessageRole.USER, content=prompt)]
@@ -160,7 +161,7 @@ class GenerationEvaluator:
         if not scores:
             return None
 
-        return float(statistics.median(scores))
+        return int(round(statistics.median(scores)))
 
     @staticmethod
     def _normalize_text(text: str) -> str:
@@ -268,10 +269,15 @@ class GenerationEvaluator:
         self,
         samples_with_answers: list[dict[str, Any]],
         llm: Any,
-    ) -> dict[str, float]:
-        """Вычисляет faithfulness, relevance, correctness через LLM-as-judge."""
+    ) -> dict[str, Any]:
+        """Вычисляет faithfulness, relevance, correctness через LLM-as-judge.
+        В списках *_scores хранятся сырые оценки 1–5; агрегаты llm_faithfulness и т.д. — в 0–1.
+        """
         eval_llm = llm
-        f_scores, r_scores, c_scores = [], [], []
+        n = len(samples_with_answers)
+        f_scores: list[int | None] = [None] * n
+        r_scores: list[int | None] = [None] * n
+        c_scores: list[int | None] = [None] * n
         f_na = r_na = c_na = 0
         errors = 0
         for idx, row in enumerate(tqdm(samples_with_answers, desc="LLM-as-judge", unit="samp")):
@@ -297,7 +303,7 @@ class GenerationEvaluator:
                 if fp is None:
                     errors += 1
                 else:
-                    f_scores.append(fp)
+                    f_scores[idx] = fp
 
             if not question or not answer:
                 r_na += 1
@@ -315,7 +321,7 @@ class GenerationEvaluator:
                 if rp is None:
                     errors += 1
                 else:
-                    r_scores.append(rp)
+                    r_scores[idx] = rp
 
             refs_clean = [str(r).strip() for r in refs if r and str(r).strip()]
             if not question or not answer or not refs_clean:
@@ -336,21 +342,34 @@ class GenerationEvaluator:
                 if cp is None:
                     errors += 1
                 else:
-                    c_scores.append(cp)
+                    c_scores[idx] = cp
+
+        f_valid = [x for x in f_scores if x is not None]
+        r_valid = [x for x in r_scores if x is not None]
+        c_valid = [x for x in c_scores if x is not None]
+
+        def _norm(s: int) -> float:
+            return (s - 1) / 4.0
 
         return {
-            "llm_faithfulness": sum(f_scores) / len(f_scores) if f_scores else 0.0,
-            "llm_answer_relevance": sum(r_scores) / len(r_scores) if r_scores else 0.0,
-            "llm_correctness": sum(c_scores) / len(c_scores) if c_scores else 0.0,
+            "llm_faithfulness": (sum(_norm(x) for x in f_valid) / len(f_valid)) if f_valid else 0.0,
+            "llm_answer_relevance": (
+                sum(_norm(x) for x in r_valid) / len(r_valid)
+            ) if r_valid else 0.0,
+            "llm_correctness": (sum(_norm(x) for x in c_valid) / len(c_valid)) if c_valid else 0.0,
             "llm_judge_errors": float(errors),
 
-            "llm_n_scored_faithfulness": float(len(f_scores)),
-            "llm_n_scored_relevance": float(len(r_scores)),
-            "llm_n_scored_correctness": float(len(c_scores)),
+            "llm_n_scored_faithfulness": float(len(f_valid)),
+            "llm_n_scored_relevance": float(len(r_valid)),
+            "llm_n_scored_correctness": float(len(c_valid)),
 
             "llm_n_na_faithfulness": float(f_na),
             "llm_n_na_relevance": float(r_na),
             "llm_n_na_correctness": float(c_na),
+
+            "llm_faithfulness_scores": f_scores,
+            "llm_relevance_scores": r_scores,
+            "llm_correctness_scores": c_scores,
         }
 
     def evaluate(
@@ -438,5 +457,9 @@ class GenerationEvaluator:
             result["llm_n_na_faithfulness"] = llm_metrics["llm_n_na_faithfulness"]
             result["llm_n_na_relevance"] = llm_metrics["llm_n_na_relevance"]
             result["llm_n_na_correctness"] = llm_metrics["llm_n_na_correctness"]
+
+            result["llm_faithfulness_scores"] = llm_metrics["llm_faithfulness_scores"]
+            result["llm_relevance_scores"] = llm_metrics["llm_relevance_scores"]
+            result["llm_correctness_scores"] = llm_metrics["llm_correctness_scores"]
 
         return result

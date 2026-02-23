@@ -96,7 +96,16 @@ def run_full_evaluation(
         out["llm_judge_errors"] = pipeline_metrics["llm_judge_errors"]
 
     if output_path:
+        pipeline_no_per_sample = {
+            k: v for k, v in out["pipeline"].items()
+            if k not in (
+                "llm_faithfulness_scores",
+                "llm_relevance_scores",
+                "llm_correctness_scores"
+            )
+        }
+        out_to_save = {**out, "pipeline": pipeline_no_per_sample}
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(out, f, ensure_ascii=False, indent=2)
+            json.dump(out_to_save, f, ensure_ascii=False, indent=2)
 
     return out

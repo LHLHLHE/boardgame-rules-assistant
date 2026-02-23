@@ -95,9 +95,15 @@ def main(
             limit=limit,
             fail_fast=fail_fast,
         )
+        pipeline_skip = {
+            "n_evaluated", "errors",
+            "llm_faithfulness_scores",
+            "llm_relevance_scores",
+            "llm_correctness_scores",
+        }
         pipeline_out = {
             k: v for k, v in pipeline_metrics.items()
-            if k not in ("n_evaluated", "errors")
+            if k not in pipeline_skip
         }
         results["pipeline"] = pipeline_out
         results["n_samples"] = len(dataset_data)
