@@ -1,2 +1,4 @@
 model: intfloat/multilingual-e5-base
 dim: 768
+text_instruction: "passage: "
+query_instruction: "query: "

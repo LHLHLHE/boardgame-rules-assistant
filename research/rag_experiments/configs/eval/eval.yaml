@@ -1,5 +1,7 @@
 testset_size: 200
 single_hop_ratio: 0.7
 seed: 42
+multi_chunks_min: 2
+multi_chunks_max: 3
 semantic_similarity_model: ai-forever/ru-en-RoSBERTa
 semantic_similarity_instruction: "classification: "

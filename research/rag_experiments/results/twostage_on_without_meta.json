@@ -1,0 +1,16 @@
+{
+  "experiment_id": "twostage_on_without_meta",
+  "use_metadata_filter": true,
+  "two_stage": true,
+  "models": {
+    "embedding": "intfloat/multilingual-e5-base"
+  },
+  "retriever": {
+    "recall_at_k": 0.8237500000000003,
+    "precision_at_k": 0.11150000000000002,
+    "map_at_k": 0.6239087301587299,
+    "ndcg_at_k": 0.6969286530892205,
+    "hit_rate": 0.925
+  },
+  "n_samples": 200
+}

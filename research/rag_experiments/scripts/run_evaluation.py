@@ -15,6 +15,7 @@ from src.retriever import Retriever
 def main(
     dataset: str | Path | None = None,
     dataset_hf: str | None = None,
+    dataset_hf_filename: str | None = None,
     limit: int | None = None,
     retriever_only: bool = False,
     pipeline_only: bool = False,
@@ -22,21 +23,27 @@ def main(
     top_k: int | None = None,
     output: str | Path | None = None,
     fail_fast: bool = False,
+    overrides: str | None = None,
 ) -> None:
-    cfg = get_cfg()
+    overrides_list = None
+    if overrides is not None and overrides.strip():
+        overrides_list = [s.strip() for s in overrides.replace(",", " ").split() if s.strip()]
+
+    cfg = get_cfg(overrides_list)
     paths = paths_from_cfg(cfg)
 
     hf_repo = dataset_hf or OmegaConf.select(cfg, "data.eval_dataset_hf_repo", default=None)
     if hf_repo is not None and str(hf_repo).strip():
+        hf_filename = dataset_hf_filename or "boardgame_rules_qa_dataset_ru_chunk512.jsonl"
         dataset_data = load_qa_dataset_from_hf(
             str(hf_repo).strip(),
-            filename="boardgame_rules_qa_dataset_ru.jsonl"
+            filename=hf_filename,
         )
     else:
         dataset_path = (
             Path(dataset)
             if dataset
-            else paths["eval_datasets_dir"] / "eval_dataset.jsonl"
+            else paths["eval_datasets_dir"] / "eval_dataset_chunk512.jsonl"
         )
         if not dataset_path.exists():
             print(f"Error: dataset not found: {dataset_path}", file=sys.stderr)

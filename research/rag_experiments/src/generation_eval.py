@@ -395,8 +395,14 @@ class GenerationEvaluator:
             if not refs:
                 continue
 
+            game_title = (row.get("game_title") or "").strip() or None
+            game_titles = [game_title] if game_title else None
             try:
-                answer, context = self.generator.generate(query)
+                answer, context = self.generator.generate(
+                    query,
+                    game_title=game_title,
+                    game_titles=game_titles,
+                )
             except Exception as e:
                 errors += 1
                 err_msg = f"{type(e).__name__}: {e}"

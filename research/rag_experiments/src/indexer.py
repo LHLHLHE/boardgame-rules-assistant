@@ -27,12 +27,14 @@ def create_embed_model(cfg: DictConfig) -> HuggingFaceEmbedding:
         "embedding.model",
         default="intfloat/multilingual-e5-base"
     ))
+    text_instruction = str(OmegaConf.select(cfg, "embedding.text_instruction", default=""))
+    query_instruction = str(OmegaConf.select(cfg, "embedding.query_instruction", default=""))
     return HuggingFaceEmbedding(
         model_name=model,
         device=device,
         trust_remote_code=True,
-        text_instruction="passage: ",
-        query_instruction="query: ",
+        text_instruction=text_instruction,
+        query_instruction=query_instruction,
     )
 
 

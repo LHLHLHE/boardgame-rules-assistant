@@ -59,14 +59,20 @@ def load_documents(
             print(f"WARNING: Файл не найден: {text_path}")
             continue
 
+        raw_titles = row["game_title"][:3] if row["game_title"] else []
+        game_titles = [
+            title.strip().lower() for title in raw_titles
+            if title is not None and title.strip()
+        ]
         doc = Document(
             text=text_path.read_text(encoding="utf-8"),
             metadata={
                 "source_doc_id": row["doc_id"],
-                "game_titles": row["game_title"],
+                "game_titles": game_titles,
                 "lang": row["lang"],
-                "source_file": str(text_path.name),
-            }
+            },
+            excluded_embed_metadata_keys=["source_doc_id", "lang"],
+            excluded_llm_metadata_keys=["source_doc_id", "lang"],
         )
         batch.append(doc)
         if len(batch) >= batch_size:

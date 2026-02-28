@@ -3,13 +3,15 @@ import logging
 import random
 import re
 import shutil
+import unicodedata
+from collections import Counter
 from pathlib import Path
 from typing import Any, IO
 
 from langchain_core.documents import Document as LCDocument
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.core.llms import LLM
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from pydantic import BaseModel, ValidationError, model_validator
 from tqdm import tqdm
 
@@ -102,14 +104,22 @@ class QADatasetGenerator:
         "Иначе верни {\"question\": \"...\", \"ground_truths\": [\"...\"], \"evidence\": [...]}. "
         "ОБЯЗАТЕЛЬНО: в evidence ровно N элементов - столько же, сколько фрагментов. "
         "По одному элементу {\"fragment\": i, \"quote\": \"...\"} на каждый. Не меньше, не больше. "
-        "Каждый quote — дословная цитата из соответствующего фрагмента, строго 1-3 предложения.\n\n"
+        "Каждый quote — дословная цитата из соответствующего фрагмента, строго 1-3 предложения. "
+        "Quote должен быть точной подстрокой соответствующего фрагмента (не перефразируй).\n\n"
         "Пример (game_title=Каркассон, 2 фрагмента):\n"
         "{\"question\": \"Сколько очков приносит завершённый город в игре Каркассон "
         "и когда их получают?\", "
         "\"ground_truths\": [\"2 очка за каждую плитку города, в конце партии\"], "
         "\"evidence\": [{\"fragment\": 1, \"quote\": \"Завершённый город приносит "
         "2 очка за каждую плитку.\"}, "
-        "{\"fragment\": 2, \"quote\": \"Очки за город начисляют в конце партии.\"}]}"
+        "{\"fragment\": 2, \"quote\": \"Очки за город начисляют в конце партии.\"}]}\n\n"
+        "Пример для 3 фрагментов (структура та же — ровно 3 элемента в evidence):\n"
+        "{\"question\": \"В игре Сеттер Сколько карт раздают в начале партии, "
+        "какой ход считается первым и когда игрок может взять карту из колоды?\", "
+        "\"ground_truths\": [\"по 6 карт\", \"первый ход за сдатчиком\", \"в свой ход\"], "
+        "\"evidence\": [{\"fragment\": 1, \"quote\": \"Каждому игроку сдают по 6 карт.\"}, "
+        "{\"fragment\": 2, \"quote\": \"Первый ход делает игрок слева от сдатчика.\"}, "
+        "{\"fragment\": 3, \"quote\": \"В свой ход можно взять верхнюю карту из колоды.\"}]}"
     )
 
     SINGLE_HOP_USER_TEMPLATE = """game_title: {game_title}
@@ -121,22 +131,23 @@ class QADatasetGenerator:
     MULTI_HOP_USER_TEMPLATE = """game_title: {game_title}
     Вопрос ОБЯЗАТЕЛЬНО должен содержать это название игры дословно.
 
-    Фрагменты правил (нумеруй 1..N).
-    В evidence должно быть ровно N элементов - по одному на каждый фрагмент.
-    Каждый фрагмент отделяй строкой '---':
+    Фрагментов: {n_fragments}.
+    В evidence верни ровно {n_fragments} элементов — по одному на каждый фрагмент.
+
+    Фрагменты правил (1..{n_fragments}). Каждый фрагмент отделяй строкой '---':
     {context}
     """
 
     CRITIC_SYSTEM = (
         "Ты валидатор синтетического Q&A для оценки RAG по правилам настольных игр. "
         "Тебе дан game_title, контекст(ы) и кандидат (question, ground_truths, evidence...). "
-        "Проверь: (1) вопрос на русском и содержит game_title дословно; "
-        "(2) нет стратегии/мнения; (3) ответы однозначны и числа с контекстом "
+        "Проверь: (1) нет стратегии/мнения; (2) ответы однозначны и числа с контекстом "
         "(не просто \"5\", а \"5 раундов\"); "
-        "(4) evidence-цитаты в соответствующих фрагментах "
+        "(3) evidence-цитаты в соответствующих фрагментах "
         "(дословно или с допустимыми отличиями в пунктуации/пробелах); "
-        "(5) ответы следуют из evidence/контекста без внешних знаний; "
-        "(6) для multi-hop каждый фрагмент реально используется. "
+        "(4) ответы следуют из evidence/контекста без внешних знаний; "
+        "(5) для multi-hop обязательно использование всех фрагментов: "
+        "отклони, если любой фрагмент избыточен или не нужен для ответа. "
         "Верни строго JSON без текста вокруг: {\"accept\": true/false, \"reasons\": [\"...\"]}."
     )
     CRITIC_USER_TEMPLATE = """game_title: {game_title}
@@ -184,6 +195,8 @@ class QADatasetGenerator:
         self.single_hop_ratio = single_hop_ratio
         self.max_retries = max_retries
         self.critic_llm = critic_llm or create_eval_llm(cfg, temperature=0)
+        self.multi_chunks_min = int(OmegaConf.select(cfg, "eval.multi_chunks_min", default=2))
+        self.multi_chunks_max = int(OmegaConf.select(cfg, "eval.multi_chunks_max", default=2))
 
     @staticmethod
     def _extract_json_from_response(response: str) -> dict | None:
@@ -300,7 +313,11 @@ class QADatasetGenerator:
             return None
         return parsed
 
-    def _generate_multi_hop(self, docs: list[LCDocument]) -> dict | None:
+    def _generate_multi_hop(
+        self,
+        docs: list[LCDocument],
+        hint: str | None = None,
+    ) -> dict | None:
         """Генерирует один Q&A сэмпл по 2–3 чанкам. None при ошибке."""
         game_title = self._get_game_title(docs[0])
         if not game_title:
@@ -310,7 +327,14 @@ class QADatasetGenerator:
             content = doc.page_content or ""
             parts.append(f"--- Фрагмент {i} ---\n{content}")
         context = "\n\n".join(parts)
-        prompt = self.MULTI_HOP_USER_TEMPLATE.format(game_title=game_title, context=context)
+        n_fragments = len(docs)
+        prompt = self.MULTI_HOP_USER_TEMPLATE.format(
+            game_title=game_title,
+            context=context,
+            n_fragments=n_fragments
+        )
+        if hint:
+            prompt = f"ВАЖНО: {hint}\n\n{prompt}"
         messages = [
             ChatMessage(role=MessageRole.SYSTEM, content=self.MULTI_HOP_SYSTEM),
             ChatMessage(role=MessageRole.USER, content=prompt),
@@ -330,8 +354,15 @@ class QADatasetGenerator:
 
     @staticmethod
     def _normalize_for_quote_match(s: str) -> str:
-        """Нормализация для проверки цитаты: пробелы + удаление пунктуации."""
-        norm = re.sub(r"\s+", " ", (s or "").strip())
+        """
+        Нормализация для проверки цитаты.
+
+        Цель: снизить ложные несовпадения из-за регистра/юникода/пунктуации/пробелов,
+        но при этом оставаться строгими к перефразированию.
+        """
+        norm = unicodedata.normalize("NFKC", (s or ""))
+        norm = norm.strip().lower().replace("ё", "е")
+        norm = re.sub(r"\s+", " ", norm)
         return re.sub(r"[^\w\s]", "", norm)
 
     BARE_NUMERIC_RE = re.compile(r"^\s*[\d\s\-,\.]+\s*$")
@@ -364,6 +395,22 @@ class QADatasetGenerator:
                 return True
         return game_title.lower() in q_lower
 
+    @staticmethod
+    def _is_mostly_russian(text: str, min_cyrillic_ratio: float = 0.3) -> bool:
+        """
+        Детерминированная проверка, что текст в основном на русском.
+
+        Считаем долю кириллицы среди буквенных символов (без цифр/пробелов/пунктуации),
+        чтобы наличие латиницы в названии игры или артефактов не ломало проверку.
+        """
+        if not text:
+            return False
+        letters = [c for c in text if c.isalpha()]
+        if not letters:
+            return False
+        cyr = sum(1 for c in letters if "\u0400" <= c <= "\u04FF")
+        return (cyr / len(letters)) >= float(min_cyrillic_ratio)
+
     def _fast_validate_single_hop(
         self,
         game_title: str,
@@ -375,6 +422,8 @@ class QADatasetGenerator:
         if not self._game_title_in_question(question, game_title):
             out["question"] = f"В игре {game_title} {question}".strip()
             question = out["question"]
+        if not self._is_mostly_russian(question):
+            return False, "non-russian question"
         if self.FORBIDDEN_WORDS_RE.search(question):
             return False, "forbidden words (strategy/advice)"
         gts = out.get("ground_truths") or []
@@ -401,6 +450,8 @@ class QADatasetGenerator:
         if not self._game_title_in_question(question, game_title):
             out["question"] = f"В игре {game_title} {question}".strip()
             question = out["question"]
+        if not self._is_mostly_russian(question):
+            return False, "non-russian question"
         if self.FORBIDDEN_WORDS_RE.search(question):
             return False, "forbidden words (strategy/advice)"
         gts = out.get("ground_truths") or []
@@ -475,7 +526,7 @@ class QADatasetGenerator:
     def _metadata_for_gold_context(metadata: dict) -> dict[str, Any]:
         """Сериализует метаданные для gold_contexts."""
         out: dict[str, Any] = {}
-        for key in ("game_titles", "lang", "source_file", "source_doc_id"):
+        for key in ("game_titles", "lang", "source_doc_id"):
             value = metadata.get(key)
             if value is None:
                 continue
@@ -588,6 +639,7 @@ class QADatasetGenerator:
                         record = {
                             "id": f"{start_idx + idx:06d}",
                             "question_type": "single_hop",
+                            "game_title": (game_title or ""),
                             "question": out["question"],
                             "ground_truths": out["ground_truths"],
                             "gold_contexts": gold_contexts,
@@ -613,7 +665,7 @@ class QADatasetGenerator:
                 else:
                     logger.debug("Single-hop sample skipped after retries.")
 
-            multi_chunks_min, multi_chunks_max = 2, 2
+            multi_chunks_min, multi_chunks_max = self.multi_chunks_min, self.multi_chunks_max
             multi_done = 0
             while multi_done < n_multi:
                 if not doc_ids_with_multi:
@@ -622,8 +674,10 @@ class QADatasetGenerator:
                 group = by_doc_id[doc_id]
                 n_use = min(rng.randint(multi_chunks_min, multi_chunks_max), len(group))
                 docs = rng.sample(group, n_use)
+                hint: str | None = None
                 for attempt in range(self.max_retries + 1):
-                    out = self._generate_multi_hop(docs)
+                    out = self._generate_multi_hop(docs, hint=hint)
+                    hint = None
                     if out and out.get("skip"):
                         skipped += 1
                         break
@@ -644,6 +698,13 @@ class QADatasetGenerator:
                                     ev = out.get("evidence")
                                     ev_preview = ""
                                     if "evidence length" in (reason or ""):
+                                        n_frag = len(fragments)
+                                        n_ev = len(ev) if isinstance(ev, list) else 0
+                                        hint = (
+                                            f"Ты вернул evidence длины {n_ev} при N={n_frag}. "
+                                            f"Верни ровно {n_frag} элемента evidence, "
+                                            f"с fragment=1..{n_frag}, quote непустые, дословные."
+                                        )
                                         ev_preview = " | evidence_frag_ids="
                                         if isinstance(ev, list) and ev:
                                             ids = [str(e.get("fragment", "?")) for e in ev[:8]]
@@ -663,6 +724,7 @@ class QADatasetGenerator:
                         record = {
                             "id": f"{start_idx + idx:06d}",
                             "question_type": "multi_hop",
+                            "game_title": (game_title or ""),
                             "question": out["question"],
                             "ground_truths": out["ground_truths"],
                             "gold_contexts": gold_contexts,
@@ -700,6 +762,7 @@ class QADatasetGenerator:
         Прогон критика по уже сгенерированным записям. Возвращает только принятые.
         """
         accepted: list[dict[str, Any]] = []
+        reject_reasons: Counter[str] = Counter()
         for rec in tqdm(records, desc="Critic pass", unit="samp"):
             gold = rec.get("gold_contexts") or []
             if not gold:
@@ -729,7 +792,7 @@ class QADatasetGenerator:
                 "evidence_quote": rec.get("evidence_quote"),
                 "evidence": rec.get("evidence"),
             }
-            accept, _ = self._critic_validate(
+            accept, reasons = self._critic_validate(
                 game_title, context, candidate, is_multi_hop=is_multi
             )
             if accept:
@@ -738,6 +801,20 @@ class QADatasetGenerator:
                     out_file.write(json.dumps(rec, ensure_ascii=False) + "\n")
                     if len(accepted) % flush_every == 0:
                         out_file.flush()
+            else:
+                reasons = reasons or ["critic reject"]
+                reject_reasons.update(reasons)
+                logger.debug(
+                    "Critic reject: id=%s | type=%s | game_title=%r | reasons=%s | question=%s",
+                    rec.get("id"),
+                    rec.get("question_type"),
+                    game_title,
+                    reasons,
+                    (rec.get("question") or ""),
+                )
+        if reject_reasons:
+            top = ", ".join(f"{k}={v}" for k, v in reject_reasons.most_common(10))
+            logger.info("Critic reject reasons (top): %s", top)
         return accepted
 
 

@@ -96,6 +96,8 @@ class Generator:
         query: str,
         top_k: int | None = None,
         system_prompt: str | None = None,
+        game_title: str | None = None,
+        game_titles: list[str] | None = None,
     ) -> tuple[str, str]:
         """
         Генерирует ответ с помощью RAG.
@@ -104,11 +106,14 @@ class Generator:
             query: Вопрос пользователя.
             top_k: Число чанков для извлечения (по умолчанию из config).
             system_prompt: Опциональный кастомный system prompt.
+            game_title: Название игры для фильтра по метаданным (один вариант).
+            game_titles: Список названий игр для фильтра (приоритет над game_title).
 
         Returns:
             Кортеж (ответ, контекст, переданный в LLM).
         """
-        context = self.retriever.retrieve_with_context(query, top_k=top_k)
+        titles = game_titles if game_titles is not None else ([game_title] if game_title else None)
+        context = self.retriever.retrieve_with_context(query, top_k=top_k, game_titles=titles)
         if system_prompt is None:
             system_prompt = DEFAULT_SYSTEM_PROMPT
 
@@ -140,6 +145,8 @@ class Generator:
         query: str,
         top_k: int | None = None,
         system_prompt: str | None = None,
+        game_title: str | None = None,
+        game_titles: list[str] | None = None,
     ):
         """
         Генерирует ответ стримингом.
@@ -148,11 +155,14 @@ class Generator:
             query: Вопрос пользователя.
             top_k: Число чанков для извлечения.
             system_prompt: Опциональный system prompt.
+            game_title: Название игры для фильтра по метаданным.
+            game_titles: Список названий игр для фильтра.
 
         Yields:
             Токены по мере генерации.
         """
-        context = self.retriever.retrieve_with_context(query, top_k=top_k)
+        titles = game_titles if game_titles is not None else ([game_title] if game_title else None)
+        context = self.retriever.retrieve_with_context(query, top_k=top_k, game_titles=titles)
 
         if system_prompt is None:
             system_prompt = DEFAULT_SYSTEM_PROMPT

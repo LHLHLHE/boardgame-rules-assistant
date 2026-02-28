@@ -1,1 +1,6 @@
 top_k: 5
+use_metadata_filter: false
+two_stage: false
+first_stage_k: 20
+second_stage_k: 10
+reranker_model: "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"

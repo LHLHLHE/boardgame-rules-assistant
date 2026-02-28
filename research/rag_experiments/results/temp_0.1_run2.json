@@ -1,0 +1,32 @@
+{
+  "experiment_id": "temp_0.1_run2",
+  "temperature": 0.1,
+  "run_idx": 2,
+  "models": {
+    "generation": "qwen2.5:7b-instruct",
+    "embedding": "intfloat/multilingual-e5-base",
+    "semantic_eval": "ai-forever/ru-en-RoSBERTa",
+    "llm_judge": "qwen2.5:7b-instruct"
+  },
+  "retriever": {},
+  "pipeline": {
+    "chrfpp": 0.36478756131103696,
+    "rouge1_recall": 0.7769304525634447,
+    "rouge2_recall": 0.5491838776476935,
+    "rougeL_f1": 0.2741267658490938,
+    "semantic_similarity": 0.6930127121148584,
+    "llm_faithfulness": 0.8409090909090909,
+    "llm_answer_relevance": 0.7525,
+    "llm_correctness": 0.795,
+    "llm_judge_errors": 0.0,
+    "llm_n_scored_faithfulness": 198.0,
+    "llm_n_scored_relevance": 200.0,
+    "llm_n_scored_correctness": 200.0,
+    "llm_n_na_faithfulness": 2.0,
+    "llm_n_na_relevance": 0.0,
+    "llm_n_na_correctness": 0.0
+  },
+  "n_samples": 200,
+  "n_evaluated": 200,
+  "errors": 0
+}

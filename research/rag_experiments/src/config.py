@@ -23,7 +23,7 @@ def get_cfg(overrides: list[str] | None = None) -> DictConfig:
 
 
 def get_collection_name(cfg: DictConfig) -> str:
-    return str(OmegaConf.select(cfg, "qdrant.collection_name", default="boardgame_rules"))
+    return str(OmegaConf.select(cfg, "qdrant.collection_name", default="boardgame_rules_chunk512"))
 
 
 def paths_from_cfg(cfg: DictConfig) -> dict[str, Path]:

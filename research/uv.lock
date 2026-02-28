@@ -393,6 +393,7 @@ dependencies = [
     { name = "llama-index-core" },
     { name = "llama-index-embeddings-huggingface" },
     { name = "llama-index-llms-ollama" },
+    { name = "llama-index-postprocessor-sbert-rerank" },
     { name = "llama-index-vector-stores-qdrant" },
     { name = "matplotlib" },
     { name = "nltk" },
@@ -432,6 +433,7 @@ requires-dist = [
     { name = "llama-index-core", specifier = ">=0.14.13" },
     { name = "llama-index-embeddings-huggingface", specifier = ">=0.6.1" },
     { name = "llama-index-llms-ollama", specifier = ">=0.9.1" },
+    { name = "llama-index-postprocessor-sbert-rerank", specifier = ">=0.4.2" },
     { name = "llama-index-vector-stores-qdrant", specifier = ">=0.9.1" },
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "nltk", specifier = ">=3.9.2" },
@@ -1231,6 +1233,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c1/42/866e43f86ebe6c8ae0c3a2a473642f1438d0f7e006188a998c3ef4e5e357/llama_index_llms_ollama-0.9.1.tar.gz", hash = "sha256:d5885ed65ae2e2bc74ba9e3ffd3a5bcd7c5341ef0670e3d9fe200880fc19f9a6", size = 9077, upload-time = "2025-12-19T03:24:46.466Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/be/cd/aa2499dc38c1cc513cab56f9a74e5526d1a97717f35a62295fda0d363bf6/llama_index_llms_ollama-0.9.1-py3-none-any.whl", hash = "sha256:da6469be951605841f7e33ce1bbb5b72c65de0f084b250e7f78aacac84379d5f", size = 8721, upload-time = "2025-12-19T03:24:47.438Z" },
+]
+
+[[package]]
+name = "llama-index-postprocessor-sbert-rerank"
+version = "0.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "llama-index-core" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9a/90/0fdad13b96719aa2e2ca3e0be29974546260adde7798a52d3b36a1c84829/llama_index_postprocessor_sbert_rerank-0.4.2.tar.gz", hash = "sha256:9161aa23b9cff766978e839788cd13b7fed9b6ffb7a0feaeaa09fc7553b18862", size = 4756, upload-time = "2025-09-08T20:41:02.932Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/25/3cc63b078d5ff611121770fbb89abfa88063ee298bc9be54a5479b56361c/llama_index_postprocessor_sbert_rerank-0.4.2-py3-none-any.whl", hash = "sha256:32925b8ccd877c6106119701eecb49b645862482c746b9adfbe1f5ec0c5d1111", size = 4494, upload-time = "2025-09-08T20:41:01.927Z" },
 ]
 
 [[package]]

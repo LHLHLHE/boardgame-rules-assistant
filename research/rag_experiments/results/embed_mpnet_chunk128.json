@@ -1,0 +1,17 @@
+{
+  "experiment_id": "embed_mpnet_chunk128",
+  "top_k": 10,
+  "chunk_size": 128,
+  "embedding_model": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+  "models": {
+    "embedding": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+  },
+  "retriever": {
+    "recall_at_k": 0.4524999999999998,
+    "precision_at_k": 0.05799999999999989,
+    "map_at_k": 0.31025033068783064,
+    "ndcg_at_k": 0.3588618681044431,
+    "hit_rate": 0.535
+  },
+  "n_samples": 200
+}

@@ -17,6 +17,7 @@ dependencies = [
     "llama-index-core>=0.14.13",
     "llama-index-embeddings-huggingface>=0.6.1",
     "llama-index-llms-ollama>=0.9.1",
+    "llama-index-postprocessor-sbert-rerank>=0.4.2",
     "llama-index-vector-stores-qdrant>=0.9.1",
     "matplotlib>=3.10.8",
     "nltk>=3.9.2",

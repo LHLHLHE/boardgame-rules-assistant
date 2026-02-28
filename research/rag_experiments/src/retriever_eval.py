@@ -105,6 +105,9 @@ class RetrieverEvaluator:
         """
         Оценивает retriever на QA датасете.
 
+        При two_stage=True метрики считаются при k=second_stage_k (финальное число
+        результатов после реранкера), иначе - при k=top_k.
+
         Returns:
             recall_at_k, precision_at_k, ndcg_at_k, hit_rate.
         """
@@ -118,6 +121,13 @@ class RetrieverEvaluator:
                 "hit_rate": 0.0
             }
 
+        two_stage = bool(OmegaConf.select(self.cfg, "retrieval.two_stage", default=False))
+        eval_k = (
+            int(OmegaConf.select(self.cfg, "retrieval.second_stage_k", default=5))
+            if two_stage
+            else self.top_k
+        )
+
         recs, precs, aps, ndcgs, hits = [], [], [], [], []
         for row in tqdm(samples, desc="Retriever eval", unit="samp"):
             query = row.get("question") or row.get("user_input", "")
@@ -125,8 +135,10 @@ class RetrieverEvaluator:
                 continue
 
             gold_fps = get_gold_fingerprints(row)
-            results = self.retriever.retrieve(query, top_k=self.top_k)
-            m = self.compute_retrieval_metrics_for_sample(results, gold_fps, self.top_k)
+            game_title = (row.get("game_title") or "").strip() or None
+            game_titles = [game_title] if game_title else None
+            results = self.retriever.retrieve(query, top_k=self.top_k, game_titles=game_titles)
+            m = self.compute_retrieval_metrics_for_sample(results, gold_fps, eval_k)
             recs.append(m["recall"])
             precs.append(m["precision"])
             aps.append(m["ap"])

@@ -23,16 +23,19 @@ BAD_CHUNK_PATTERNS = re.compile(
 )
 
 
-def is_good_chunk(text: str) -> bool:
+def is_good_chunk(text: str, chunk_size: int | None = None) -> bool:
     """
     Проверяет, подходит ли чанк для генерации Q&A (без служебного шума).
 
     Отсекает: короткие чанки, URL, копирайт, слишком мало кириллицы, слишком много цифр.
+    chunk_size: размер чанка в токенах (128, 256, 512).
     """
     if not text or not isinstance(text, str):
         return False
     text = text.strip()
-    if len(text) < 300:
+    min_length_by_chunk = {128: 80, 256: 200, 512: 300}
+    min_length = min_length_by_chunk.get(chunk_size, 300) if chunk_size is not None else 300
+    if len(text) < min_length:
         return False
     if BAD_CHUNK_PATTERNS.search(text):
         return False
@@ -62,7 +65,7 @@ def payload_to_metadata(payload: dict) -> dict:
     if not isinstance(meta, dict):
         meta = {}
     out = {k: v for k, v in meta.items() if v is not None}
-    for key in ("game_titles", "lang", "source_file", "source_doc_id"):
+    for key in ("game_titles", "lang", "source_doc_id"):
         if key in payload and payload[key] is not None:
             out[key] = payload[key]
     game_titles = out.get("game_titles")
@@ -287,6 +290,11 @@ def load_qa_dataset_from_jsonl(path: str | Path) -> list[dict[str, Any]]:
             rec = {
                 "id": row.get("id", ""),
                 "question_type": row.get("question_type", ""),
+                "game_title": (
+                    (row.get("game_title") or "").strip()
+                    if row.get("game_title") is not None
+                    else ""
+                ),
                 "question": row.get("question", ""),
                 "ground_truths": (
                     row.get("ground_truths")
@@ -309,7 +317,7 @@ def load_qa_dataset_from_jsonl(path: str | Path) -> list[dict[str, Any]]:
 
 def load_qa_dataset_from_hf(
     repo_id: str,
-    filename: str = "boardgame_rules_qa_dataset_ru.jsonl",
+    filename: str = "boardgame_rules_qa_dataset_ru_chunk512.jsonl",
     repo_type: str = "dataset",
 ) -> list[dict[str, Any]]:
     """
