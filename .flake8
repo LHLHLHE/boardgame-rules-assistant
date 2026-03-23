@@ -1,0 +1,14 @@
+[flake8]
+extend-ignore = 
+    E203,D104,D100,D101,D107,I001,D102,
+    A003,D106,D105,I005,D103,VNE001,VNE002,
+    VNE003,E800,A002,C901,R504,A005
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist
+    venv/*
+    .venv/*
+    */alembic/*
+max-line-length = 100
