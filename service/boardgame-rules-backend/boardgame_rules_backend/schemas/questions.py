@@ -6,6 +6,10 @@ class QuestionRequest(BaseModel):
 
     game_id: int = Field(..., description="Идентификатор игры (как в GET /api/v1/games)")
     query: str = Field(..., description="Вопрос по правилам")
+    history: str | None = Field(
+        default=None,
+        description="Опциональный контекст предыдущих вопросов/ответов в серии",
+    )
 
 
 class QuestionResponse(BaseModel):

@@ -113,18 +113,6 @@ services:
       backend:
         condition: service_healthy
 
-#  bot:
-#    build:
-#      context: ../boardgame-rules-bot
-#      dockerfile: Dockerfile
-#    container_name: boardgame-bot
-#    restart: unless-stopped
-#    env_file:
-#      - ./.env
-#    depends_on:
-#      backend:
-#        condition: service_healthy
-
   nginx:
     image: nginx:stable-alpine3.17-slim
     container_name: boardgame-nginx
@@ -137,6 +125,42 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: boardgame-ngrok
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    # Публичный URL → nginx → /webhook → bot (как в проде)
+    command: http nginx:80
+    ports:
+      - "4040:4040"  # веб-интерфейс ngrok
+    depends_on:
+      nginx:
+        condition: service_healthy
+
+  bot:
+    build:
+      context: ../boardgame-rules-bot
+      dockerfile: Dockerfile
+    container_name: boardgame-bot
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      WEBHOOK_FROM_NGROK: "true"
+      NGROK_API_URL: http://ngrok:4040
+    depends_on:
+      backend:
+        condition: service_healthy
+      ngrok:
+        condition: service_started
 
 volumes:
   postgres_data:

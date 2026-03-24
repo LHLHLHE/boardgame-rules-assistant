@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 import tiktoken
@@ -7,7 +8,9 @@ from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.llms.openai import OpenAI
 
 from boardgame_rules_backend.rag.prompts import DEFAULT_SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
-from boardgame_rules_backend.settings import rag_config
+from boardgame_rules_backend.settings import app_config, rag_config, truncate_for_log
+
+logger = logging.getLogger(__name__)
 
 
 class VllmOpenAICompatibleLLM(OpenAI):
@@ -56,10 +59,18 @@ class Generator:
             temperature=self._temperature,
         )
 
-    async def generate(self, query: str, context: str) -> str:
+    async def generate(self, query: str, context: str, history: str | None = None) -> str:
         """Generate answer from query and context."""
         llm = self._get_llm()
-        prompt = USER_PROMPT_TEMPLATE.format(context=context, query=query)
+        history_text = (history or "").strip() or "История отсутствует."
+        prompt = USER_PROMPT_TEMPLATE.format(context=context, history=history_text, query=query)
+        if app_config.rag_debug_log:
+            logger.info(
+                "[RAG] llm prompt system_preview=%r user_chars=%s user_preview=%r",
+                truncate_for_log(DEFAULT_SYSTEM_PROMPT, app_config.rag_log_max_chars),
+                len(prompt),
+                truncate_for_log(prompt, app_config.rag_log_max_chars),
+            )
         messages = [
             ChatMessage(role=MessageRole.SYSTEM, content=DEFAULT_SYSTEM_PROMPT),
             ChatMessage(role=MessageRole.USER, content=prompt),

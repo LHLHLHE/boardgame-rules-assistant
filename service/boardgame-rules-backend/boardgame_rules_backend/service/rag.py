@@ -14,7 +14,7 @@ class QAService:
         self.generator = generator
         self.game_repo = game_repo
 
-    async def get_answer(self, game_id: int, query: str) -> str:
+    async def get_answer(self, game_id: int, query: str, history: str | None = None) -> str:
         game = await self.game_repo.get_game_by_id(game_id)
         if not game:
             raise GameNotFound()
@@ -43,7 +43,7 @@ class QAService:
                 truncate_for_log(context, max_c),
             )
 
-        answer = await self.generator.generate(query=query, context=context)
+        answer = await self.generator.generate(query=query, context=context, history=history)
 
         if app_config.rag_debug_log:
             logger.info(

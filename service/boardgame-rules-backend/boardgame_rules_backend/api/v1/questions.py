@@ -30,5 +30,5 @@ async def ask_question(
     payload: QuestionRequest,
     rag_service: Annotated[QAService, Depends(get_qa_service)],
 ) -> QuestionResponse:
-    answer = await rag_service.get_answer(payload.game_id, payload.query)
+    answer = await rag_service.get_answer(payload.game_id, payload.query, payload.history)
     return QuestionResponse(answer=answer)
