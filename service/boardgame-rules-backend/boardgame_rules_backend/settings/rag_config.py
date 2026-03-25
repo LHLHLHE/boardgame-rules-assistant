@@ -15,7 +15,7 @@ class RetrievalConfig(BaseModel):
     top_k: int = Field(default=10, ge=1, le=50)
     use_metadata_filter: bool = True
     two_stage: bool = False
-    first_stage_k: int = Field(default=20, ge=5, le=100)
+    first_stage_k: int = Field(default=100, ge=100, le=500)
     second_stage_k: int = Field(default=10, ge=1, le=50)
     reranker_model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
 

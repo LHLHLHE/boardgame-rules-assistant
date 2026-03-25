@@ -1,6 +1,6 @@
 {
   "experiment_id": "twostage_on_without_meta",
-  "use_metadata_filter": true,
+  "use_metadata_filter": false,
   "two_stage": true,
   "models": {
     "embedding": "intfloat/multilingual-e5-base"

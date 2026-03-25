@@ -1,6 +1,6 @@
 {
-  "experiment_id": "twostage_f30_s3",
-  "first_stage_k": 30,
+  "experiment_id": "twostage_f200_s3",
+  "first_stage_k": 200,
   "second_stage_k": 3,
   "models": {
     "embedding": "intfloat/multilingual-e5-base"
