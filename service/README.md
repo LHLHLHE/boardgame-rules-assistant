@@ -84,6 +84,60 @@
 - API и Swagger UI: **http://localhost:8000**. Документация: **http://localhost:8000/docs**, схема OpenAPI: **http://localhost:8000/openapi.json**. Через Nginx на порту 80 эти пути не проксируются (прокси только `/api/`), поэтому для Swagger удобнее открыть порт 8000.  
 - Проверка здоровья: `GET /api/health` (например **http://localhost:8000/api/health**).
 
+## Тесты backend (unit + integration)
+
+Тесты находятся в `service/boardgame-rules-backend/tests` и разделены маркерами:
+
+- `unit` - быстрые изолированные тесты с моками зависимостей;
+- `integration` - API-тесты с реальной инфраструктурой.
+
+### Основной сценарий: запуск внутри контейнера
+
+```bash
+cd service/infra-test
+cp .env.test.example .env.test
+docker compose up -d --build
+```
+
+Ниже команды запускаются на хосте и исполняют `pytest` внутри контейнера `backend`.
+
+Unit внутри контейнера:
+
+```bash
+docker compose exec backend uv run python -m pytest -m unit
+```
+
+Integration внутри контейнера:
+
+```bash
+docker compose exec backend uv run python -m pytest -m integration
+```
+
+Все тесты внутри контейнера:
+
+```bash
+docker compose exec backend uv run python -m pytest
+```
+
+Остановить тестовую инфраструктуру:
+
+```bash
+docker compose down -v
+```
+
+### Локальный альтернативный сценарий (только unit, без infra)
+
+```bash
+cd service/boardgame-rules-backend
+uv sync
+uv run --project . python -m pytest -m unit
+```
+
+Примечание по PostgreSQL: внутри docker-сети используется `POSTGRES_HOST=postgres` и
+`POSTGRES_PORT=5432`; host-порт задаётся отдельно через `POSTGRES_HOST_PORT`.
+Дефолт для integration в `.env.test`: `RUN_INTEGRATION_TESTS=1`,
+`INTEGRATION_BASE_URL=http://backend:8000`.
+
 ## Telegram-бот: сценарий использования
 
 1. Включите inline mode у бота в BotFather: `/setinline`.
