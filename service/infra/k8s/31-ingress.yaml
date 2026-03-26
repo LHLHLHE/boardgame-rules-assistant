@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: boardgame-ingress
+  namespace: boardgame-prod
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - example.com
+      secretName: boardgame-tls
+  rules:
+    - host: example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000
+          - path: /webhook
+            pathType: Prefix
+            backend:
+              service:
+                name: bot
+                port:
+                  number: 8081
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-frontend
+                port:
+                  number: 80

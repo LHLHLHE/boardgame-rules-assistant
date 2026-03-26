@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: boardgame-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: boardgame-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: boardgame-config
+            - secretRef:
+                name: boardgame-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 40
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: boardgame-prod
+spec:
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

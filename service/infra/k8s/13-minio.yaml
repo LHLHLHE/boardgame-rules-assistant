@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: boardgame-prod
+spec:
+  serviceName: minio-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          args:
+            - server
+            - /data
+            - --console-address
+            - ":9001"
+          ports:
+            - containerPort: 9000
+              name: s3
+            - containerPort: 9001
+              name: console
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: boardgame-secrets
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: boardgame-secrets
+                  key: MINIO_ROOT_PASSWORD
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: minio-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-headless
+  namespace: boardgame-prod
+spec:
+  clusterIP: None
+  selector:
+    app: minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: boardgame-prod
+spec:
+  selector:
+    app: minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001

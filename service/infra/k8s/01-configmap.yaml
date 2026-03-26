@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: boardgame-config
+  namespace: boardgame-prod
+data:
+  ENVIRONMENT: "prod"
+  LOG_LEVEL: "INFO"
+  RAG_DEBUG_LOG: "false"
+
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "boardgame_rules"
+
+  REDIS_URL: "redis://redis:6379/0"
+
+  QDRANT_HOST: "qdrant"
+  QDRANT_PORT: "6333"
+
+  S3_ENDPOINT_URL: "http://minio:9000"
+  S3_BUCKET: "boardgame-rules"
+
+  RAG_LLM__API_BASE: "http://vllm-llm:8000/v1"
+  RAG_LLM__MODEL: "Qwen/Qwen2.5-7B-Instruct"
+  RAG_EMBEDDING__API_BASE: "http://vllm-embedding:8000/v1"
+  RAG_EMBEDDING__MODEL: "intfloat/multilingual-e5-base"
+
+  BACKEND_URL: "http://backend:8000"
+  WEBAPP_HOST: "0.0.0.0"
+  WEBAPP_PORT: "8081"
+
+  # Change this to your public HTTPS domain.
+  WEBHOOK_HOST: "https://example.com"
