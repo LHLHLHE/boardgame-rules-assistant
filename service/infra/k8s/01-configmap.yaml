@@ -7,6 +7,7 @@ data:
   ENVIRONMENT: "prod"
   LOG_LEVEL: "INFO"
   RAG_DEBUG_LOG: "false"
+  ENABLE_DOCS_IN_PROD: "false"
 
   POSTGRES_HOST: "postgres"
   POSTGRES_PORT: "5432"
@@ -28,6 +29,7 @@ data:
   BACKEND_URL: "http://backend:8000"
   WEBAPP_HOST: "0.0.0.0"
   WEBAPP_PORT: "8081"
+  CORS_ALLOW_ORIGINS: "https://example.com"
 
   # Change this to your public HTTPS domain.
   WEBHOOK_HOST: "https://example.com"

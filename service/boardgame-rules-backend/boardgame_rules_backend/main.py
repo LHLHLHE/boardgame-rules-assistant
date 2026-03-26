@@ -15,7 +15,7 @@ from boardgame_rules_backend.connectors import (get_qdrant_async_client, get_qdr
                                                 get_s3_client)
 from boardgame_rules_backend.exception_handlers import register_exception_handlers
 from boardgame_rules_backend.rag import Generator, Retriever
-from boardgame_rules_backend.settings import build_log_config, logging_settings
+from boardgame_rules_backend.settings import app_config, build_log_config, logging_settings
 
 
 @asynccontextmanager
@@ -51,15 +51,28 @@ app = FastAPI(
     ),
     version="0.1.0",
     lifespan=lifespan,
+    docs_url=None if app_config.is_prod and not app_config.enable_docs_in_prod else "/docs",
+    redoc_url=None if app_config.is_prod and not app_config.enable_docs_in_prod else "/redoc",
+    openapi_url=(
+        None if app_config.is_prod and not app_config.enable_docs_in_prod else "/openapi.json"
+    ),
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if app_config.is_prod:
+    if app_config.cors_allow_origins_list:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=app_config.cors_allow_origins_list,
+            allow_credentials=False,
+            allow_methods=app_config.cors_allow_methods_list or ["*"],
+        )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+    )
 
 register_exception_handlers(app)
 

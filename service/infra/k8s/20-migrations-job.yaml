@@ -17,6 +17,8 @@ spec:
           image: boardgame-backend:latest
           imagePullPolicy: IfNotPresent
           command:
+            - uv
+            - run
             - alembic
             - upgrade
             - head

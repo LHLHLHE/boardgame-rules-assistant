@@ -18,6 +18,8 @@ spec:
           image: boardgame-backend:latest
           imagePullPolicy: IfNotPresent
           command:
+            - uv
+            - run
             - celery
             - -A
             - boardgame_rules_backend.tasks_app.celery:celery_app

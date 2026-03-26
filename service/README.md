@@ -84,6 +84,73 @@
 - API и Swagger UI: **http://localhost:8000**. Документация: **http://localhost:8000/docs**, схема OpenAPI: **http://localhost:8000/openapi.json**. Через Nginx на порту 80 эти пути не проксируются (прокси только `/api/`), поэтому для Swagger удобнее открыть порт 8000.  
 - Проверка здоровья: `GET /api/health` (например **http://localhost:8000/api/health**).
 
+## Прод-развертывание на одной VM (Docker Compose)
+
+- `docker-compose.yml` - сервисы backend, bot, celery, postgres, redis, qdrant, minio, nginx и certbot.
+- `nginx.prod.conf.template` - маршрутизация `/api`, `/webhook`, `/`; статика админ-панели раздается напрямую самим nginx (копируется из `ADMIN_FRONTEND_IMAGE` в volume).
+- `.env.compose.example` - шаблон переменных окружения.
+- Для серверного сценария без исходников используются готовые образы (`BACKEND_IMAGE`, `BOT_IMAGE`, `ADMIN_FRONTEND_IMAGE`).
+
+### 1) Подготовка переменных
+
+```bash
+cd service/infra
+cp .env.compose.example .env
+```
+
+Обязательно проверьте в `.env`:
+
+- `DOMAIN`
+- `LETSENCRYPT_EMAIL`
+- `BACKEND_IMAGE`, `BOT_IMAGE`, `ADMIN_FRONTEND_IMAGE`
+- `BOT_TOKEN`
+- `JWT_SECRET`
+- `BOT_API_TOKEN` и `BACKEND_BOT_TOKEN` (должны совпадать)
+- `POSTGRES_PASSWORD`, `MINIO_ROOT_PASSWORD`, `AWS_SECRET_ACCESS_KEY`
+
+### 2) Выпустить первичный TLS-сертификат (one-time)
+
+```bash
+docker run --rm -it \
+  -p 80:80 \
+  -v "$(pwd)/certbot_conf:/etc/letsencrypt" \
+  -v "$(pwd)/certbot_www:/var/www/certbot" \
+  certbot/certbot certonly --standalone \
+  --email "$LETSENCRYPT_EMAIL" \
+  --agree-tos --no-eff-email \
+  -d "$DOMAIN"
+```
+
+### 3) Поднять стек
+
+`vLLM` сервисы (`vllm-llm` и `vllm-embedding`) входят в compose-стек и запускаются всегда.
+На хосте должны быть доступны GPU и NVIDIA runtime.
+
+```bash
+docker compose up -d
+```
+
+### 4) Проверка
+
+```bash
+docker compose ps
+docker compose logs -f nginx
+curl -fsS https://<ваш-домен>/api/health
+```
+
+### 5) Webhook Telegram
+
+Бот выставляет webhook как `WEBHOOK_HOST + /webhook`. Для прода:
+
+- `WEBHOOK_HOST=https://<ваш-домен>`
+- `WEBHOOK_FROM_NGROK=false`
+
+После изменения перезапустите только бота:
+
+```bash
+docker compose up -d bot
+```
+
 ## Прод-развертывание на одной VM (Minikube)
 
 Ниже описан сценарий для одной ВМ.
@@ -108,14 +175,15 @@ kubectl version --client
 Пример старта:
 
 ```bash
-minikube start --driver=docker
+minikube start --driver=docker --cpus=12 --memory=32768 --disk-size=120g --gpus all
 minikube addons enable ingress
+minikube addons enable nvidia-device-plugin
 ```
 
 Установить cert-manager:
 
 ```bash
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.0/cert-manager.yaml
 kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=180s
 ```
 
@@ -139,6 +207,8 @@ docker build -t boardgame-admin-panel:latest ../admin-panel
 1. Отредактируйте `service/infra/k8s/02-secret.example.yaml` (токены, пароли, `JWT_SECRET`).
 2. Отредактируйте `service/infra/k8s/01-configmap.yaml`:
    - `WEBHOOK_HOST=https://<ваш-домен>`
+   - `CORS_ALLOW_ORIGINS=https://<ваш-домен>` (если нужны запросы только с вашего фронтенд-origin)
+   - `ENABLE_DOCS_IN_PROD=false` (оставьте `false`, чтобы `/docs`, `/redoc`, `/openapi.json` были закрыты в проде)
 3. Отредактируйте `service/infra/k8s/30-cluster-issuer.yaml`:
    - `email: <ваш-email>`
 4. Отредактируйте `service/infra/k8s/31-ingress.yaml`:

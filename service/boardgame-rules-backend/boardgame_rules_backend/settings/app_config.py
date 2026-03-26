@@ -36,6 +36,10 @@ class AppConfig(BaseSettings):
     rag_debug_log: bool = False
     rag_log_max_chars: int = 3000
 
+    cors_allow_origins: str = ""
+    cors_allow_methods: str = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    enable_docs_in_prod: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
@@ -57,6 +61,14 @@ class AppConfig(BaseSettings):
     @property
     def is_prod(self):
         return self.environment == "prod"
+
+    @property
+    def cors_allow_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_allow_origins.split(",") if origin.strip()]
+
+    @property
+    def cors_allow_methods_list(self) -> list[str]:
+        return [method.strip() for method in self.cors_allow_methods.split(",") if method.strip()]
 
 
 app_config = AppConfig()
