@@ -142,8 +142,8 @@ def process_rules_document(
 
 @celery_app.task(
     bind=True,
-    soft_time_limit=60 * 60,
-    time_limit=60 * 60,
+    soft_time_limit=60 * 180,
+    time_limit=60 * 180,
 )
 def process_manifest_index_batch(self, rules_document_ids: list[int]) -> dict:
     """

@@ -36,7 +36,7 @@ async def test_games_crud_flow(api_client, admin_auth_headers):
     list_response = await api_client.get("/api/v1/games", headers=admin_auth_headers)
     assert list_response.status_code == 200
 
-    ids = [item["id"] for item in list_response.json()]
+    ids = [item["id"] for item in list_response.json()["items"]]
     assert game_id in ids
 
     delete_response = await api_client.delete(

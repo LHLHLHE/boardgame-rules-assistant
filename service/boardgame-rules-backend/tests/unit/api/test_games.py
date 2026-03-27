@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from boardgame_rules_backend.dependencies import (get_game_service, require_admin,
                                                   require_bot_or_moderator, require_moderator)
 from boardgame_rules_backend.exceptions import DuplicateGameTitle, EmptyFileError, GameNotFound
+from boardgame_rules_backend.schemas.games import GameListRead, GameRead
 
 pytestmark = pytest.mark.unit
 
@@ -21,23 +23,29 @@ def _override_auth_dependencies(fastapi_app, auth_user_factory):
 async def test_list_games_success(api_client, fastapi_app, auth_user_factory):
     _override_auth_dependencies(fastapi_app, auth_user_factory)
     game_service = AsyncMock()
+    ts = datetime(2026, 1, 1, tzinfo=UTC)
     game_service.list_games = AsyncMock(
-        return_value=[
-            {
-                "id": 1,
-                "title": "Catan",
-                "source_doc_url": None,
-                "created_at": "2026-01-01T00:00:00+00:00",
-                "updated_at": "2026-01-01T00:00:00+00:00",
-            }
-        ]
+        return_value=GameListRead(
+            items=[
+                GameRead(
+                    id=1,
+                    title="Catan",
+                    source_doc_url=None,
+                    created_at=ts,
+                    updated_at=ts,
+                )
+            ],
+            total=1,
+        )
     )
     fastapi_app.dependency_overrides[get_game_service] = lambda: game_service
 
     response = await api_client.get("/api/v1/games?skip=0&limit=50&search=cat")
 
     assert response.status_code == 200
-    assert response.json()[0]["title"] == "Catan"
+    body = response.json()
+    assert body["items"][0]["title"] == "Catan"
+    assert body["total"] == 1
     game_service.list_games.assert_awaited_once_with(skip=0, limit=50, search="cat")
 
 

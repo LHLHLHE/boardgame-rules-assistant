@@ -27,7 +27,12 @@ async def fetch_games(search: str | None = None, limit: int = 50) -> list[dict]:
             ) as resp:
                 if resp.status != 200:
                     return []
-                return await resp.json()
+                data = await resp.json()
+                if isinstance(data, dict) and "items" in data:
+                    return data["items"]
+                if isinstance(data, list):
+                    return data
+                return []
     except Exception as e:
         logger.exception("fetch_games failed: %s", e)
         return []

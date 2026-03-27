@@ -12,12 +12,12 @@ function DataManagement() {
   const [limitInput, setLimitInput] = useState('');
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
-  const { data: games = [], isLoading } = useQuery({
+  const { data: gamesData, isLoading } = useQuery({
     queryKey: ['games'],
     queryFn: () => fetchGames(0, 1),
   });
 
-  const hasGames = games.length > 0;
+  const hasGames = (gamesData?.total ?? 0) > 0;
 
   const parsedLimit = limitInput.trim() === '' ? undefined : Number.parseInt(limitInput, 10);
   const limitValid =

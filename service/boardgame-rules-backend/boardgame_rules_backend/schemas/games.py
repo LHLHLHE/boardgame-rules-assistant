@@ -57,6 +57,13 @@ class GameRead(GameBase):
     updated_at: datetime = Field(..., description="Дата обновления")
 
 
+class GameListRead(BaseModel):
+    """Список игр с общим количеством (пагинация)."""
+
+    items: list[GameRead] = Field(..., description="Страница записей")
+    total: int = Field(..., ge=0, description="Всего записей с учётом search")
+
+
 class RulesDocumentRead(BaseModel):
     """Схема документа с правилами."""
 

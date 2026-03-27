@@ -18,7 +18,8 @@ from boardgame_rules_backend.exceptions import (EmptyFileError, GameNotFound,
 from boardgame_rules_backend.models import RulesDocument, RulesDocumentStatus
 from boardgame_rules_backend.repository import GameRepository
 from boardgame_rules_backend.schemas.games import (CreateGameWithRulesResponse, GameCreate,
-                                                   GameRead, GameUpdate, RulesDocumentRead)
+                                                   GameListRead, GameRead, GameUpdate,
+                                                   RulesDocumentRead)
 from boardgame_rules_backend.schemas.mappers import to_game_read, to_rules_document_read
 from boardgame_rules_backend.tasks_app import process_manifest_index_batch, process_rules_document
 
@@ -39,9 +40,11 @@ class GameService:
         skip: int = 0,
         limit: int = 100,
         search: str | None = None,
-    ) -> list[GameRead]:
+    ) -> GameListRead:
         games = await self.game_repo.get_games(skip=skip, limit=limit, search=search)
-        return [to_game_read(game) for game in games]
+        total = await self.game_repo.count_games(search=search)
+        items = [to_game_read(game) for game in games]
+        return GameListRead(items=items, total=total)
 
     async def get_game(self, game_id: int) -> GameRead:
         game = await self.game_repo.get_game_by_id(game_id)

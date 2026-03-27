@@ -72,7 +72,12 @@ export interface Game {
   updated_at: string;
 }
 
-export async function fetchGames(skip = 0, limit = 100, search?: string): Promise<Game[]> {
+export interface GameListResponse {
+  items: Game[];
+  total: number;
+}
+
+export async function fetchGames(skip = 0, limit = 100, search?: string): Promise<GameListResponse> {
   const params = new URLSearchParams({ skip: String(skip), limit: String(limit) });
   if (search !== undefined && search.trim() !== '') {
     params.set('search', search.trim());

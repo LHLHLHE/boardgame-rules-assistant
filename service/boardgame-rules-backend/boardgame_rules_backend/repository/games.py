@@ -42,6 +42,14 @@ class GameRepository:
         result = await self.pg_db_session.execute(stmt)
         return list(result.scalars().all())
 
+    async def count_games(self, search: str | None = None) -> int:
+        stmt = select(func.count(Game.id))
+        if search and search.strip():
+            pattern = f"%{search.strip()}%"
+            stmt = stmt.where(Game.title.ilike(pattern))
+        result = await self.pg_db_session.execute(stmt)
+        return int(result.scalar_one())
+
     async def get_game_by_id(self, game_id: int) -> Game | None:
         result = await self.pg_db_session.execute(
             select(Game).where(Game.id == game_id)

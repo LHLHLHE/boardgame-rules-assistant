@@ -12,7 +12,7 @@ from boardgame_rules_backend.dependencies import (get_game_service, require_admi
                                                   require_bot_or_moderator, require_moderator)
 from boardgame_rules_backend.exceptions import EmptyFileError, GameNotFound
 from boardgame_rules_backend.schemas import (AuthUser, CreateGameWithRulesResponse, GameCreate,
-                                             GameRead, GameUpdate, RulesDocumentRead,
+                                             GameListRead, GameRead, GameUpdate, RulesDocumentRead,
                                              UploadRulesResponse)
 from boardgame_rules_backend.service import GameService
 
@@ -102,7 +102,7 @@ async def clear_games(
 
 @router.get(
     "",
-    response_model=list[GameRead],
+    response_model=GameListRead,
     summary="Список игр",
     description=(
         "Возвращает список игр с пагинацией. Параметр search - поиск по названию. "
