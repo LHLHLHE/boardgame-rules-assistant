@@ -1,6 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from boardgame_rules_bot.constants import CALLBACK_ACTION_ASK, CALLBACK_ACTION_CANCEL
+from boardgame_rules_bot.constants import (CALLBACK_ACTION_ASK, CALLBACK_ACTION_CANCEL,
+                                           CALLBACK_ACTION_DOWNLOAD_SOURCE)
 
 
 def build_start_keyboard() -> InlineKeyboardMarkup:
@@ -14,6 +15,12 @@ def build_start_keyboard() -> InlineKeyboardMarkup:
 def build_waiting_question_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Скачать правила",
+                    callback_data=CALLBACK_ACTION_DOWNLOAD_SOURCE,
+                ),
+            ],
             [
                 InlineKeyboardButton(
                     text="🔁 Сменить игру",

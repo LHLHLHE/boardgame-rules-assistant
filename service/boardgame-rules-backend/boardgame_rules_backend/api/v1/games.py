@@ -2,15 +2,17 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException
 from fastapi import Path as PathParam
 from fastapi import Query, UploadFile
+from fastapi.responses import Response
 
 from boardgame_rules_backend.api.utils import extract_zip_safely
 from boardgame_rules_backend.dependencies import (get_game_service, require_admin,
                                                   require_bot_or_moderator, require_moderator)
-from boardgame_rules_backend.exceptions import EmptyFileError, GameNotFound
+from boardgame_rules_backend.exceptions import EmptyFileError, GameNotFound, RulesSourceNotFound
 from boardgame_rules_backend.schemas import (AuthUser, CreateGameWithRulesResponse, GameCreate,
                                              GameListRead, GameRead, GameUpdate, RulesDocumentRead,
                                              UploadRulesResponse)
@@ -25,7 +27,8 @@ TASKS_URL = "/api/v1/background-tasks"
     summary="Инициализация из манифеста",
     description=(
         "Загружает игры и правила из CSV-манифеста и ZIP-архива. "
-        "manifest: CSV с game_title, lang, text_path (идентификатор документа — хэш содержимого). "
+        "manifest: CSV с game_title, lang, text_path; опционально "
+        "source_path, source_sha256, source_mime для исходников правил. "
         "archive: ZIP. limit: макс. новых игр (опционально)."
     ),
     responses={
@@ -313,3 +316,38 @@ async def list_game_rules(
         return await game_service.list_game_rules(game_id)
     except GameNotFound:
         raise HTTPException(status_code=404, detail="Game not found")
+
+
+@router.get(
+    "/{game_id}/rules/source",
+    summary="Скачать исходный файл правил",
+    description=(
+        "Возвращает исходный файл правил для игры (PDF или TXT), "
+        "если он сохранён в S3."
+    ),
+    responses={
+        200: {"description": "Исходный файл правил"},
+        404: {"description": "Игра не найдена или исходник отсутствует"},
+    },
+)
+async def download_game_rules_source(
+    game_id: int = PathParam(..., description="ID игры"),
+    _auth: AuthUser | None = Depends(require_bot_or_moderator),
+    game_service: GameService = Depends(get_game_service),
+):
+    try:
+        source_bytes, filename, content_type = await game_service.get_rules_source(game_id)
+        quoted_name = quote(filename)
+        ascii_fallback = "".join(ch if ord(ch) < 128 else "_" for ch in filename) or "rules.bin"
+        return Response(
+            content=source_bytes,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": (
+                    f"attachment; filename=\"{ascii_fallback}\"; "
+                    f"filename*=UTF-8''{quoted_name}"
+                ),
+            },
+        )
+    except (GameNotFound, RulesSourceNotFound):
+        raise HTTPException(status_code=404, detail="Rules source not found")

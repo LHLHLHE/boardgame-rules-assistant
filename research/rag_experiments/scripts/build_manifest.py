@@ -1,4 +1,5 @@
 import pandas as pd
+import hashlib
 
 from src.config import get_cfg, paths_from_cfg
 
@@ -64,6 +65,40 @@ def build_index_manifest() -> None:
         if "lang" in merged.columns
         else pd.Series(["unknown"] * len(merged), index=merged.index)
     ).fillna("unknown")
+    pdf_name_series = (
+        merged["pdf_filename_docs"]
+        if "pdf_filename_docs" in merged.columns
+        else merged["pdf_filename_clean"]
+        if "pdf_filename_clean" in merged.columns
+        else pd.Series([""] * len(merged), index=merged.index)
+    )
+    source_name_series = pdf_name_series.fillna("").astype(str).str.strip()
+    source_path_series = ("data/rules_files/" + source_name_series).where(
+        source_name_series != "",
+        "",
+    )
+    source_mime_series = source_name_series.str.lower().map(
+        lambda name: "text/plain" if name.endswith(".txt") else "application/pdf" if name else ""
+    )
+    source_sha_cache: dict[str, str] = {}
+
+    def compute_source_sha256(rel_path: str) -> str:
+        rel = (rel_path or "").strip()
+        if not rel:
+            return ""
+        if rel in source_sha_cache:
+            return source_sha_cache[rel]
+
+        abs_path = paths["base_dir"] / rel
+        if not abs_path.exists() or not abs_path.is_file():
+            source_sha_cache[rel] = ""
+            return ""
+
+        digest = hashlib.sha256(abs_path.read_bytes()).hexdigest()
+        source_sha_cache[rel] = digest
+        return digest
+
+    source_sha_series = source_path_series.map(compute_source_sha256)
 
     result = pd.DataFrame({
         "doc_id": merged["raw_doc_sha256"],
@@ -72,6 +107,9 @@ def build_index_manifest() -> None:
         "game_title": merged["title"].fillna(merged.get("primary_title", "")).fillna(""),
         "lang": lang_series,
         "text_path": merged["clean_text_path"],
+        "source_path": source_path_series,
+        "source_sha256": source_sha_series,
+        "source_mime": source_mime_series,
     })
 
     manifest_path = paths["manifest_path"]

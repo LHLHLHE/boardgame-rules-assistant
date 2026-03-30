@@ -21,6 +21,7 @@ dependencies = [
     "pytesseract>=0.3.13",
     "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.22",
+    "python-slugify>=8.0.4",
     "qdrant-client>=1.17.0",
     "redis>=7.3.0",
     "sqlalchemy[asyncio]>=2.0.48",

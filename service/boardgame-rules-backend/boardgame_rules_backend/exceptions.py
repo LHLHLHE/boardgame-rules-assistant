@@ -21,6 +21,10 @@ class RulesProcessingInProgress(Exception):
     )
 
 
+class RulesSourceNotFound(Exception):
+    detail = "Rules source file not found"
+
+
 class AuthServiceError(Exception):
     status_code: int = 400
     detail: str = "Error"

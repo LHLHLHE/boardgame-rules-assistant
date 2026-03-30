@@ -131,6 +131,8 @@ export interface RulesDocument {
   game_id: number;
   doc_id: string;
   storage_path: string;
+  source_storage_path: string | null;
+  source_filename: string | null;
   lang: string;
   status: string;
   created_at: string;
@@ -171,6 +173,33 @@ export async function uploadRules(
     throw new Error(message);
   }
   return res.json();
+}
+
+function parseFilenameFromDisposition(disposition: string | null, fallback: string): string {
+  if (!disposition) return fallback;
+  const starMatch = disposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (starMatch?.[1]) return decodeURIComponent(starMatch[1]);
+  const plainMatch = disposition.match(/filename\s*=\s*"?([^";]+)"?/i);
+  if (plainMatch?.[1]) return plainMatch[1];
+  return fallback;
+}
+
+export async function downloadGameRulesSource(
+  gameId: number,
+): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch(`${API_BASE}/games/${gameId}/rules/source`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(errorMessageFromResponseBody(err));
+  }
+  const blob = await res.blob();
+  const filename = parseFilenameFromDisposition(
+    res.headers.get('Content-Disposition'),
+    `rules-${gameId}.bin`,
+  );
+  return { blob, filename };
 }
 
 export interface CreateGameWithRulesResponse {

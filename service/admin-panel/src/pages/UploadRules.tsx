@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useState, useRef, useMemo } from 'react';
-import { fetchGame, fetchGameRules, uploadRules } from '../api';
+import { downloadGameRulesSource, fetchGame, fetchGameRules, uploadRules } from '../api';
 import type { RulesDocument } from '../api';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -19,6 +19,7 @@ function UploadRules() {
   const [dragOver, setDragOver] = useState(false);
   const [taskQueuedMessage, setTaskQueuedMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const { data: game, isLoading: gameLoading } = useQuery({
     queryKey: ['game', id],
@@ -77,6 +78,24 @@ function UploadRules() {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
     e.target.value = '';
+  };
+
+  const handleDownloadSource = async () => {
+    setDownloadError(null);
+    try {
+      const { blob, filename } = await downloadGameRulesSource(Number(id!));
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось скачать исходник';
+      setDownloadError(message);
+    }
   };
 
   if (gameLoading || !game) return <div className="page">Загрузка...</div>;
@@ -146,6 +165,11 @@ function UploadRules() {
 
       <section>
         <h2>Загруженные документы</h2>
+        {downloadError && (
+          <p className="error" style={{ marginTop: '0.75rem' }}>
+            {downloadError}
+          </p>
+        )}
         {rulesLoading ? (
           <p>Загрузка...</p>
         ) : !rules?.length ? (
@@ -158,6 +182,7 @@ function UploadRules() {
                 <th>doc_id</th>
                 <th>Статус</th>
                 <th>Создан</th>
+                <th>Исходник</th>
               </tr>
             </thead>
             <tbody>
@@ -167,6 +192,15 @@ function UploadRules() {
                   <td className="mono">{r.doc_id.slice(0, 12)}...</td>
                   <td>{STATUS_LABELS[r.status] ?? r.status}</td>
                   <td>{new Date(r.created_at).toLocaleString()}</td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={handleDownloadSource}
+                      disabled={!r.source_storage_path}
+                    >
+                      Скачать исходник
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

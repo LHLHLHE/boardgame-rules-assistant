@@ -2,13 +2,14 @@ import html
 
 from aiogram import F, Router
 from aiogram.enums import MessageEntityType
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import (CallbackQuery, InlineQuery, InlineQueryResultArticle,
-                           InputTextMessageContent, Message)
+from aiogram.types import (BufferedInputFile, CallbackQuery, InlineQuery, InlineQueryResultArticle,
+                           InputFile, InputTextMessageContent, Message)
 
-from boardgame_rules_bot.backend import ask_question, fetch_games
-from boardgame_rules_bot.constants import (CALLBACK_ACTION_ASK, CALLBACK_ACTION_CANCEL, HELP_TEXT,
+from boardgame_rules_bot.backend import ask_question, download_rules_source, fetch_games
+from boardgame_rules_bot.constants import (CALLBACK_ACTION_ASK, CALLBACK_ACTION_CANCEL,
+                                           CALLBACK_ACTION_DOWNLOAD_SOURCE, HELP_TEXT,
                                            INLINE_GAME_URL_PREFIX, MAX_HISTORY_CHARS_PER_ITEM,
                                            MAX_HISTORY_TURNS)
 from boardgame_rules_bot.keyboards import (build_inline_search_keyboard, build_start_keyboard,
@@ -22,6 +23,11 @@ router = Router()
 ASK_PROMPT_TEXT = (
     "Нажмите кнопку «Найти игру» и начните вводить название игры.\n"
     "Telegram покажет результаты прямо над полем ввода."
+)
+
+NO_GAME_CONTEXT_TEXT = (
+    "Сейчас не выбрана игра: ответы по правилам не ищутся.\n\n"
+    "Нажмите «Задать вопрос» или отправьте /ask, затем выберите игру в поиске."
 )
 
 
@@ -72,6 +78,36 @@ async def callback_cancel(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer("Отменено.")
     if callback.message:
         await show_cancelled(callback.message, state)
+
+
+@router.callback_query(F.data == CALLBACK_ACTION_DOWNLOAD_SOURCE)
+async def callback_download_source(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    data = await state.get_data()
+    game_id = data.get("selected_game_id")
+    game_title = data.get("selected_game_title") or "Выбранная игра"
+    if game_id is None:
+        if callback.message:
+            await callback.message.answer("Сначала выберите игру через /ask.")
+        return
+
+    if callback.message:
+        status_message = await callback.message.answer("Готовлю файл правил...")
+    else:
+        return
+
+    file_bytes, filename, _mime, err = await download_rules_source(int(game_id))
+    if err or not file_bytes or not filename:
+        await status_message.edit_text(err or "Не удалось скачать файл правил.")
+        return
+
+    safe_filename = filename.strip() or f"rules-{game_id}.bin"
+    input_file: InputFile = BufferedInputFile(file_bytes, filename=safe_filename)
+    await status_message.delete()
+    await callback.message.answer_document(
+        document=input_file,
+        caption=f"Исходник правил для игры: {html.escape(str(game_title))}",
+    )
 
 
 @router.inline_query()
@@ -198,3 +234,9 @@ async def process_question_text(message: Message, state: FSMContext) -> None:
 async def process_question_non_text(message: Message) -> None:
     """Обработка фото, документов и прочего не-текста в состоянии вопроса."""
     await message.answer("Введите вопрос текстом.")
+
+
+@router.message(StateFilter(None), F.text)
+async def text_without_active_game(message: Message) -> None:
+    """Текст вне сессии с выбранной игрой (после отмены, /ask без выбора, сброс FSM и т.п.)."""
+    await message.answer(NO_GAME_CONTEXT_TEXT, reply_markup=build_start_keyboard())

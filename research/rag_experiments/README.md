@@ -37,6 +37,19 @@
 - **Индексация:** тексты правил - `data/rules_texts_cleaned_good/`, манифест - `manifests/index_manifest.csv`.
 - **Оценка:** локальный датасет - например `data/eval/eval_dataset_chunk512.jsonl`; можно указать репозиторий на Hugging Face в конфиге (`data.eval_dataset_hf_repo`) или передать при вызове.
 
+Формат `index_manifest.csv` для текущего пайплайна индексации требует колонки:
+- `doc_id`
+- `game_title`
+- `lang`
+- `text_path`
+
+Дополнительно манифест может содержать колонки для backend-ингеста исходников правил:
+- `source_path`
+- `source_sha256`
+- `source_mime`
+
+Эти `source_*` колонки не используются скриптами из `research/rag_experiments` и не влияют на индексацию в Qdrant.
+
 Датасет для оценки RAG на Hugging Face: [LHLHLHE/boardgame_rules_qa_dataset_ru](https://huggingface.co/datasets/LHLHLHE/boardgame_rules_qa_dataset_ru) - файлы `boardgame_rules_qa_dataset_ru_chunk512.jsonl`, `boardgame_rules_qa_dataset_ru_chunk128.jsonl` (и при необходимости другие размеры).
 
 ## Пайплайны
@@ -56,7 +69,7 @@ python -m scripts.prepare_chunk_datasets_and_collections --chunk_sizes "128,512"
 
 ### Индексация (`index_documents.py`)
 
-Читает очищенные тексты из `data/rules_texts_cleaned_good/` и манифест из `manifests/index_manifest.csv` (На текущем этапе индексация выполняется только для документов с lang=ru). Дальше:
+Читает очищенные тексты из `data/rules_texts_cleaned_good/` и манифест из `manifests/index_manifest.csv` (На текущем этапе индексация выполняется только для документов с lang=ru). Для чтения манифеста используются поля `doc_id`, `game_title`, `lang`, `text_path`; дополнительные поля (например `source_*`) игнорируются. Дальше:
 
 1. Загрузка документов и чанкинг.
 2. Эмбеддинги.

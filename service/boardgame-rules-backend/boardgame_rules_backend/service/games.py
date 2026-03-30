@@ -10,11 +10,12 @@ import aiofiles
 from boardgame_rules_backend.connectors import (delete_all_objects_under_prefix_best_effort,
                                                 delete_points_by_rules_document_id,
                                                 delete_qdrant_collection_best_effort,
-                                                delete_s3_objects_best_effort, rules_storage_key,
-                                                upload_rules_file)
+                                                delete_s3_objects_best_effort, download_rules_file,
+                                                rules_storage_key, source_content_type,
+                                                upload_rules_file, upload_source_file)
 from boardgame_rules_backend.connectors.s3 import RULES_S3_PREFIX
 from boardgame_rules_backend.exceptions import (EmptyFileError, GameNotFound,
-                                                RulesProcessingInProgress)
+                                                RulesProcessingInProgress, RulesSourceNotFound)
 from boardgame_rules_backend.models import RulesDocument, RulesDocumentStatus
 from boardgame_rules_backend.repository import GameRepository
 from boardgame_rules_backend.schemas.games import (CreateGameWithRulesResponse, GameCreate,
@@ -22,6 +23,7 @@ from boardgame_rules_backend.schemas.games import (CreateGameWithRulesResponse, 
                                                    RulesDocumentRead)
 from boardgame_rules_backend.schemas.mappers import to_game_read, to_rules_document_read
 from boardgame_rules_backend.tasks_app import process_manifest_index_batch, process_rules_document
+from boardgame_rules_backend.utils.filenames import build_rules_source_filename
 
 MANIFEST_FILENAME = "index_manifest.csv"
 REQUIRED_COLUMNS = {"game_title", "lang", "text_path"}
@@ -166,6 +168,18 @@ class GameService:
             others = await self.game_repo.count_rules_documents_same_storage_other_games(p, game_id)
             if others == 0:
                 await asyncio.to_thread(delete_s3_objects_best_effort, [p])
+        seen_source_paths: set[str] = set()
+        for doc in docs:
+            p = doc.source_storage_path
+            if not p or p in seen_source_paths:
+                continue
+            seen_source_paths.add(p)
+            others = await self.game_repo.count_rules_documents_same_source_storage_other_games(
+                p,
+                game_id,
+            )
+            if others == 0:
+                await asyncio.to_thread(delete_s3_objects_best_effort, [p])
 
     async def upload_rules(
         self,
@@ -189,9 +203,11 @@ class GameService:
         if not content.strip():
             raise EmptyFileError()
 
-        ext = (filename.rsplit(".", 1)[-1] if "." in filename else "txt").lower()
+        safe_filename = filename.strip() or "rules.txt"
+        ext = (safe_filename.rsplit(".", 1)[-1] if "." in safe_filename else "txt").lower()
         if ext not in SUPPORTED_UPLOAD_EXTENSIONS:
             raise ValueError(f"Unsupported file format. Use PDF or TXT, got: {ext}")
+        source_filename = build_rules_source_filename(game.title, ext, game_id=game.id)
 
         if existing:
             await self._cleanup_qdrant_and_s3_for_game_rules(game_id, documents=existing)
@@ -199,19 +215,52 @@ class GameService:
 
         doc_id = hashlib.sha256(content).hexdigest()
         storage_path = rules_storage_key(doc_id, "txt")
+        source_storage_path, _ = await asyncio.to_thread(
+            upload_source_file,
+            content,
+            source_filename,
+        )
 
         doc = await self.game_repo.create_rules_document(
             game_id=game_id,
             doc_id=doc_id,
             storage_path=storage_path,
+            source_storage_path=source_storage_path,
+            source_filename=source_filename,
             lang=lang,
             commit=True,
         )
 
         content_b64 = base64.b64encode(content).decode("ascii")
-        process_rules_document.delay(doc.id, content_base64=content_b64, filename=filename)
+        process_rules_document.delay(doc.id, content_base64=content_b64, filename=safe_filename)
 
         return to_rules_document_read(doc)
+
+    async def get_rules_source(self, game_id: int) -> tuple[bytes, str, str]:
+        game = await self.game_repo.get_game_by_id(game_id)
+        if not game:
+            raise GameNotFound()
+
+        docs = await self.game_repo.get_rules_by_game_id(game_id)
+        source_docs = [
+            doc for doc in docs if doc.source_storage_path and doc.source_filename
+        ]
+        if not source_docs:
+            raise RulesSourceNotFound()
+
+        latest_doc = max(source_docs, key=lambda doc: (doc.created_at, doc.id))
+        if not latest_doc.source_storage_path or not latest_doc.source_filename:
+            raise RulesSourceNotFound()
+
+        source_bytes = await asyncio.to_thread(
+            download_rules_file,
+            latest_doc.source_storage_path,
+        )
+        return (
+            source_bytes,
+            latest_doc.source_filename,
+            source_content_type(latest_doc.source_filename),
+        )
 
     async def initialize_from_manifest(
         self,
@@ -250,6 +299,9 @@ class GameService:
                 game_title = (row.get("game_title") or "").strip()
                 lang = (row.get("lang") or "ru").strip()
                 text_path_str = (row.get("text_path") or "").strip()
+                source_path_str = (row.get("source_path") or "").strip()
+                source_sha256 = (row.get("source_sha256") or "").strip().lower()
+                source_mime = (row.get("source_mime") or "").strip().lower()
 
                 if not game_title or not text_path_str:
                     continue
@@ -277,6 +329,49 @@ class GameService:
                 if game_was_created:
                     games_created += 1
 
+                source_storage_path: str | None = None
+                source_filename: str | None = None
+                if source_path_str:
+                    source_file_path = (base_path / source_path_str).resolve()
+                    try:
+                        source_file_path.relative_to(base_path.resolve())
+                    except ValueError:
+                        continue
+                    if source_file_path.exists() and source_file_path.is_file():
+                        try:
+                            async with aiofiles.open(source_file_path, "rb") as fp:
+                                source_content = await fp.read()
+                        except OSError:
+                            source_content = b""
+
+                        source_ext = source_file_path.suffix.lower().lstrip(".")
+                        if source_content and source_ext in SUPPORTED_UPLOAD_EXTENSIONS:
+                            if source_mime and source_mime not in {
+                                "application/pdf",
+                                "text/plain",
+                                "text/plain; charset=utf-8",
+                            }:
+                                raise ValueError(
+                                    f"Unsupported source_mime for {source_path_str}: {source_mime}"
+                                )
+                            source_hash = hashlib.sha256(source_content).hexdigest()
+                            if source_sha256 and source_sha256 != source_hash:
+                                raise ValueError(
+                                    f"source_sha256 mismatch for {source_path_str}: "
+                                    f"expected {source_sha256}, got {source_hash}"
+                                )
+                            source_storage_path, _ = await asyncio.to_thread(
+                                upload_source_file,
+                                source_content,
+                                source_file_path.name,
+                            )
+                            source_filename = build_rules_source_filename(
+                                game.title,
+                                source_ext,
+                                game_id=game.id,
+                            )
+                            uploaded_s3_keys.append(source_storage_path)
+
                 # No preprocessing; manifest texts are expected to be pre-cleaned.
                 s3_key, doc_id = upload_rules_file(file_content, file_path.name)
                 uploaded_s3_keys.append(s3_key)
@@ -285,6 +380,8 @@ class GameService:
                     "lang": lang,
                     "storage_path": s3_key,
                     "doc_id": doc_id,
+                    "source_storage_path": source_storage_path,
+                    "source_filename": source_filename,
                 })
                 if limit is not None and games_created >= limit:
                     break

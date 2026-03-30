@@ -24,6 +24,8 @@ class ManifestItem(TypedDict):
     lang: str
     storage_path: str
     doc_id: str
+    source_storage_path: str | None
+    source_filename: str | None
 
 
 class GameRepository:
@@ -181,6 +183,20 @@ class GameRepository:
         )
         return int(result.scalar_one())
 
+    async def count_rules_documents_same_source_storage_other_games(
+        self, source_storage_path: str, game_id: int
+    ) -> int:
+        """Rows referencing this source S3 key from games other than ``game_id``."""
+        result = await self.pg_db_session.execute(
+            select(func.count())
+            .select_from(RulesDocument)
+            .where(
+                RulesDocument.source_storage_path == source_storage_path,
+                RulesDocument.game_id != game_id,
+            )
+        )
+        return int(result.scalar_one())
+
     async def delete_rules_documents_for_game(self, game_id: int) -> None:
         """Remove all rules_documents rows for this game (after Qdrant/S3 cleanup)."""
         await self.pg_db_session.execute(
@@ -193,6 +209,8 @@ class GameRepository:
         game_id: int,
         doc_id: str,
         storage_path: str,
+        source_storage_path: str | None = None,
+        source_filename: str | None = None,
         lang: str = "ru",
         commit: bool = False,
     ) -> RulesDocument:
@@ -200,6 +218,8 @@ class GameRepository:
             game_id=game_id,
             doc_id=doc_id,
             storage_path=storage_path,
+            source_storage_path=source_storage_path,
+            source_filename=source_filename,
             lang=lang,
             status=RulesDocumentStatus.pending,
         )
@@ -224,6 +244,8 @@ class GameRepository:
                 game_id=item["game_id"],
                 doc_id=item["doc_id"],
                 storage_path=item["storage_path"],
+                source_storage_path=item["source_storage_path"],
+                source_filename=item["source_filename"],
                 lang=item["lang"],
             )
             docs_created += 1

@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import mimetypes
 from collections.abc import Iterable
 
 import boto3
@@ -40,6 +41,15 @@ def rules_storage_key(doc_id: str, extension: str = "txt") -> str:
     return f"{RULES_S3_PREFIX}by-hash/{doc_id}.{ext}"
 
 
+def source_content_type(filename: str) -> str:
+    mime_type, _ = mimetypes.guess_type(filename)
+    if mime_type:
+        if mime_type.startswith("text/"):
+            return f"{mime_type}; charset=utf-8"
+        return mime_type
+    return "application/octet-stream"
+
+
 def upload_rules_file(content: bytes, filename: str) -> tuple[str, str]:
     """Upload rules file to S3 (content-addressed key)."""
     doc_id = hashlib.sha256(content).hexdigest()
@@ -53,6 +63,23 @@ def upload_rules_file(content: bytes, filename: str) -> tuple[str, str]:
         Key=s3_key,
         Body=content,
         ContentType="text/plain; charset=utf-8",
+    )
+    return s3_key, doc_id
+
+
+def upload_source_file(content: bytes, filename: str) -> tuple[str, str]:
+    """Upload original source file to S3 using content-addressed key."""
+    doc_id = hashlib.sha256(content).hexdigest()
+    ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
+    s3_key = rules_storage_key(doc_id, ext)
+
+    client = get_s3_client()
+    ensure_bucket_exists()
+    client.put_object(
+        Bucket=app_config.s3_bucket,
+        Key=s3_key,
+        Body=content,
+        ContentType=source_content_type(filename),
     )
     return s3_key, doc_id
 

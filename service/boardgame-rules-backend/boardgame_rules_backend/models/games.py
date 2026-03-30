@@ -51,6 +51,8 @@ class RulesDocument(PGBase):
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
     doc_id: Mapped[str] = mapped_column(String(64))
     storage_path: Mapped[str] = mapped_column(String(1024))
+    source_storage_path: Mapped[str | None] = mapped_column(String(1024))
+    source_filename: Mapped[str | None] = mapped_column(String(255))
     lang: Mapped[str] = mapped_column(String(16), default="ru")
     status: Mapped[RulesDocumentStatus] = mapped_column(
         Enum(RulesDocumentStatus, name="rules_document_status"),

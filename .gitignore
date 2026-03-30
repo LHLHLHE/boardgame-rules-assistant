@@ -211,6 +211,7 @@ __marimo__/
 
 data/
 !**/configs/data/
+test_data/
 
 # Qdrant storage
 qdrant_storage/

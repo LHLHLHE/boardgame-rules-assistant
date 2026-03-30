@@ -1,6 +1,7 @@
 INLINE_GAME_URL_PREFIX = "https://bg.game/"
 CALLBACK_ACTION_ASK = "action:ask"
 CALLBACK_ACTION_CANCEL = "action:cancel"
+CALLBACK_ACTION_DOWNLOAD_SOURCE = "action:download_source"
 
 MAX_HISTORY_TURNS = 3
 MAX_HISTORY_CHARS_PER_ITEM = 600

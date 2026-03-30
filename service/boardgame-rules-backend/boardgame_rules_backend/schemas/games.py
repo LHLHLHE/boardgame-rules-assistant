@@ -73,6 +73,14 @@ class RulesDocumentRead(BaseModel):
     game_id: int = Field(..., description="ID игры")
     doc_id: str = Field(..., description="Хэш документа (SHA-256)")
     storage_path: str = Field(..., description="Путь в S3")
+    source_storage_path: str | None = Field(
+        None,
+        description="Путь к исходному файлу правил в S3",
+    )
+    source_filename: str | None = Field(
+        None,
+        description="Имя исходного файла правил",
+    )
     lang: str = Field(..., description="Код языка (ru, en и т.д.)")
     status: str = Field(..., description="Статус: pending, processing, indexed, failed")
     created_at: datetime = Field(..., description="Дата создания")

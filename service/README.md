@@ -350,6 +350,43 @@ uv run --project . python -m pytest -m unit
 
 Админ-панель использует относительный базовый путь `/api/v1` и ожидает, что страница открыта с того же origin, что и Nginx (проксирование `/api/`).
 
+## Утилита сборки subset-архива
+
+Для подготовки тестового/этапного пакета инициализации есть скрипт:
+`service/tools/build_subset_archive.py`.
+
+Скрипт:
+- берёт полный манифест (по умолчанию `manifests/index_manifest_for_service.csv`);
+- выбирает первые `N` уникальных `doc_id` (`--docs-limit`);
+- собирает ZIP с нужными файлами (`text_path` и `source_path`).
+
+Примеры запуска из корня репозитория:
+
+```bash
+python service/tools/build_subset_archive.py \
+  --docs-limit 200 \
+  --archive-mode cli_bundle \
+  --output-dir manifests/subsets
+```
+
+`cli_bundle` - в ZIP кладётся `index_manifest_subset.csv` + `data/...` файлы.
+Отдельный `index_manifest_subset.csv` на диск рядом **не** сохраняется.
+
+```bash
+python service/tools/build_subset_archive.py \
+  --docs-limit 200 \
+  --archive-mode admin_payload \
+  --output-dir manifests/subsets
+```
+
+`admin_payload` - в ZIP кладутся только `data/...` файлы, а `index_manifest_subset.csv`
+сохраняется рядом на диске.
+
+Полезные флаги:
+- `--manifest <path>` - явный путь к исходному манифесту;
+- `--output-name <name.zip>` - имя итогового архива;
+- `--strict-source` - падать, если в манифесте указан `source_path`, но файла нет.
+
 ---
 
 Корневой репозиторий также содержит каталоги `research/` (эксперименты и подготовка данных) - они не являются частью runtime этого сервиса.
