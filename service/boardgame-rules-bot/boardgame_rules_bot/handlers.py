@@ -8,10 +8,10 @@ from aiogram.types import (BufferedInputFile, CallbackQuery, InlineQuery, Inline
                            InputFile, InputTextMessageContent, Message)
 
 from boardgame_rules_bot.backend import ask_question, download_rules_source, fetch_games
+from boardgame_rules_bot.config import settings
 from boardgame_rules_bot.constants import (CALLBACK_ACTION_ASK, CALLBACK_ACTION_CANCEL,
                                            CALLBACK_ACTION_DOWNLOAD_SOURCE, HELP_TEXT,
-                                           INLINE_GAME_URL_PREFIX, MAX_HISTORY_CHARS_PER_ITEM,
-                                           MAX_HISTORY_TURNS)
+                                           INLINE_GAME_URL_PREFIX)
 from boardgame_rules_bot.keyboards import (build_inline_search_keyboard, build_start_keyboard,
                                            build_waiting_question_keyboard)
 from boardgame_rules_bot.states import AskStates
@@ -215,12 +215,12 @@ async def process_question_text(message: Message, state: FSMContext) -> None:
     next_history = [
         *qa_history,
         {
-            "q": clip_text(query, MAX_HISTORY_CHARS_PER_ITEM),
-            "a": clip_text(a, MAX_HISTORY_CHARS_PER_ITEM),
+            "q": clip_text(query, settings.max_history_chars_per_item),
+            "a": clip_text(a, settings.max_history_chars_per_item),
         },
     ]
-    if len(next_history) > MAX_HISTORY_TURNS:
-        next_history = next_history[-MAX_HISTORY_TURNS:]
+    if len(next_history) > settings.max_history_turns:
+        next_history = next_history[-settings.max_history_turns :]
     await state.update_data(qa_history=next_history)
 
     text = a[:4000]

@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     ngrok_poll_interval_sec: float = 1.0
     ngrok_poll_timeout_sec: float = 30.0
 
+    max_history_turns: int = 3
+    max_history_chars_per_item: int = 600
+    max_history_chars_total: int = 3000
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -3,10 +3,6 @@ CALLBACK_ACTION_ASK = "action:ask"
 CALLBACK_ACTION_CANCEL = "action:cancel"
 CALLBACK_ACTION_DOWNLOAD_SOURCE = "action:download_source"
 
-MAX_HISTORY_TURNS = 3
-MAX_HISTORY_CHARS_PER_ITEM = 600
-MAX_HISTORY_CHARS_TOTAL = 3000
-
 HELP_TEXT = """
 Я помощник по правилам настольных игр.
 
