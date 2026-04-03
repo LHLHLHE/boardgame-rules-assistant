@@ -26,7 +26,7 @@ def build_waiting_question_keyboard() -> InlineKeyboardMarkup:
                     text="🔁 Сменить игру",
                     switch_inline_query_current_chat="",
                 ),
-                InlineKeyboardButton(text="Отмена", callback_data=CALLBACK_ACTION_CANCEL),
+                InlineKeyboardButton(text="В главное меню", callback_data=CALLBACK_ACTION_CANCEL),
             ]
         ]
     )
