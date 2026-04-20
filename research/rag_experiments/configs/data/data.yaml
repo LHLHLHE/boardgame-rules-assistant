@@ -1,0 +1,6 @@
+manifest_path: manifests/index_manifest.csv
+data_dir: data/rules_texts_cleaned_good
+eval_datasets_dir: data/eval
+# Опционально: repo_id датасета на Hugging Face Hub.
+# Если задан, run_evaluation по умолчанию загружает датасет оттуда.
+eval_dataset_hf_repo: LHLHLHE/boardgame_rules_qa_dataset_ru

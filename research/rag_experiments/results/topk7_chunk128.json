@@ -1,0 +1,17 @@
+{
+  "experiment_id": "topk7_chunk128",
+  "top_k": 7,
+  "chunk_size": 128,
+  "embedding_model": "intfloat/multilingual-e5-base",
+  "models": {
+    "embedding": "intfloat/multilingual-e5-base"
+  },
+  "retriever": {
+    "recall_at_k": 0.7866666666666668,
+    "precision_at_k": 0.14785714285714255,
+    "map_at_k": 0.6161488095238093,
+    "ndcg_at_k": 0.682950472717282,
+    "hit_rate": 0.905
+  },
+  "n_samples": 200
+}

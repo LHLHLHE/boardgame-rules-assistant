@@ -1,0 +1,114 @@
+name: boardgame-rules-assistant-test
+services:
+  postgres:
+    image: postgres:17.7-alpine
+    container_name: boardgame-test-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_HOST_PORT:-5434}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-boardgame}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-boardgame}
+      POSTGRES_DB: ${POSTGRES_DB:-boardgame_rules_test}
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.2.4-alpine
+    container_name: boardgame-test-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.17
+    container_name: boardgame-test-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_HTTP_PORT:-6335}:6333"
+      - "${QDRANT_GRPC_PORT:-6336}:6334"
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    volumes:
+      - qdrant_test_storage:/qdrant/storage
+
+  minio:
+    image: minio/minio:latest
+    container_name: boardgame-test-minio
+    restart: unless-stopped
+    command: server /data
+    ports:
+      - "${MINIO_API_PORT:-9002}:9000"
+      - "${MINIO_CONSOLE_PORT:-9003}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_test_data:/data
+
+  mock-openai:
+    image: python:3.12-alpine
+    container_name: boardgame-test-mock-openai
+    restart: unless-stopped
+    command: ["python", "/app/mock_openai.py"]
+    environment:
+      MOCK_EMBEDDING_DIM: ${MOCK_EMBEDDING_DIM:-768}
+    volumes:
+      - ../boardgame-rules-backend/tests/integration/mock_openai.py:/app/mock_openai.py:ro
+    ports:
+      - "${MOCK_OPENAI_PORT:-18080}:8080"
+
+  migrations:
+    build:
+      context: ../boardgame-rules-backend
+      dockerfile: Dockerfile
+    container_name: boardgame-test-migrations
+    command: uv run alembic upgrade head
+    env_file:
+      - ./.env.test
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ../boardgame-rules-backend
+      dockerfile: Dockerfile.test
+    container_name: boardgame-test-backend
+    restart: unless-stopped
+    env_file:
+      - ./.env.test
+    ports:
+      - "${BACKEND_PORT:-8001}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--max-time", "5", "http://127.0.0.1:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      minio:
+        condition: service_started
+      mock-openai:
+        condition: service_started
+
+volumes:
+  postgres_test_data:
+  qdrant_test_storage:
+  minio_test_data:

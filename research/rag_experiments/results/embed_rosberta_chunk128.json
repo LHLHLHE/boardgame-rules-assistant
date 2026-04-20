@@ -1,0 +1,17 @@
+{
+  "experiment_id": "embed_rosberta_chunk128",
+  "top_k": 10,
+  "chunk_size": 128,
+  "embedding_model": "ai-forever/ru-en-RoSBERTa",
+  "models": {
+    "embedding": "ai-forever/ru-en-RoSBERTa"
+  },
+  "retriever": {
+    "recall_at_k": 0.7475000000000002,
+    "precision_at_k": 0.09649999999999989,
+    "map_at_k": 0.522077380952381,
+    "ndcg_at_k": 0.5957365600423601,
+    "hit_rate": 0.845
+  },
+  "n_samples": 200
+}

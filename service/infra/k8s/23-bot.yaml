@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bot
+  namespace: boardgame-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bot
+  template:
+    metadata:
+      labels:
+        app: bot
+    spec:
+      containers:
+        - name: bot
+          image: boardgame-bot:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              name: webhook
+          envFrom:
+            - configMapRef:
+                name: boardgame-config
+            - secretRef:
+                name: boardgame-secrets
+          env:
+            - name: BACKEND_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: boardgame-secrets
+                  key: BOT_API_TOKEN
+            - name: WEBHOOK_FROM_NGROK
+              value: "false"
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bot
+  namespace: boardgame-prod
+spec:
+  selector:
+    app: bot
+  ports:
+    - name: webhook
+      port: 8081
+      targetPort: 8081

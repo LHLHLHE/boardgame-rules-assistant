@@ -1,0 +1,16 @@
+{
+  "experiment_id": "twostage_f500_s10",
+  "first_stage_k": 500,
+  "second_stage_k": 10,
+  "models": {
+    "embedding": "intfloat/multilingual-e5-base"
+  },
+  "retriever": {
+    "recall_at_k": 0.8704166666666668,
+    "precision_at_k": 0.11900000000000004,
+    "map_at_k": 0.6582966269841269,
+    "ndcg_at_k": 0.7325136302144684,
+    "hit_rate": 0.955
+  },
+  "n_samples": 200
+}

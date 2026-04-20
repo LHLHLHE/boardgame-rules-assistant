@@ -1,0 +1,17 @@
+{
+  "experiment_id": "embed_gte_chunk128",
+  "top_k": 10,
+  "chunk_size": 128,
+  "embedding_model": "Alibaba-NLP/gte-multilingual-base",
+  "models": {
+    "embedding": "Alibaba-NLP/gte-multilingual-base"
+  },
+  "retriever": {
+    "recall_at_k": 0.7216666666666666,
+    "precision_at_k": 0.0959999999999999,
+    "map_at_k": 0.4603591269841273,
+    "ndcg_at_k": 0.54472737479083,
+    "hit_rate": 0.835
+  },
+  "n_samples": 200
+}

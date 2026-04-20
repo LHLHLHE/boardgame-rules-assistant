@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vllm-cache
+  namespace: boardgame-prod
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 40Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: boardgame-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      containers:
+        - name: vllm-llm
+          image: vllm/vllm-openai:latest
+          args:
+            - --model
+            - Qwen/Qwen2.5-7B-Instruct
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8010"
+            - --generation-config
+            - vllm
+            - --gpu-memory-utilization
+            - "0.80"
+            - --max-model-len
+            - "24576"
+          ports:
+            - containerPort: 8010
+              name: llm
+          volumeMounts:
+            - name: vllm-cache
+              mountPath: /root/.cache/huggingface
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            initialDelaySeconds: 90
+            periodSeconds: 20
+        - name: vllm-embedding
+          image: vllm/vllm-openai:latest
+          args:
+            - --model
+            - intfloat/multilingual-e5-base
+            - --runner
+            - pooling
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8011"
+            - --gpu-memory-utilization
+            - "0.10"
+          ports:
+            - containerPort: 8011
+              name: embedding
+          volumeMounts:
+            - name: vllm-cache
+              mountPath: /root/.cache/huggingface
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 6Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8011
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8011
+            initialDelaySeconds: 60
+            periodSeconds: 20
+      volumes:
+        - name: vllm-cache
+          persistentVolumeClaim:
+            claimName: vllm-cache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-llm
+  namespace: boardgame-prod
+spec:
+  selector:
+    app: vllm
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8010
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-embedding
+  namespace: boardgame-prod
+spec:
+  selector:
+    app: vllm
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8011

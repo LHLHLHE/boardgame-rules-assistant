@@ -1,0 +1,9 @@
+defaults:
+  - data: data
+  - qdrant: qdrant
+  - embedding: embedding
+  - chunking: chunking
+  - llm: llm
+  - eval_llm: eval_llm
+  - retrieval: retrieval
+  - eval: eval

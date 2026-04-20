@@ -1,0 +1,4 @@
+[core]
+    remote = storage
+['remote "storage"']
+    url = /Volumes/Files/boardgame_rules_rag/dvcstore

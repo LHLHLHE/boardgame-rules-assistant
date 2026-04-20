@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - 00-namespace.yaml
+  - 01-configmap.yaml
+  - 02-secret.example.yaml
+  - 10-postgres.yaml
+  - 11-redis.yaml
+  - 12-qdrant.yaml
+  - 13-minio.yaml
+  - 14-vllm.yaml
+  - 20-migrations-job.yaml
+  - 21-backend.yaml
+  - 22-celery.yaml
+  - 23-bot.yaml
+  - 24-admin-frontend.yaml
+  - 30-cluster-issuer.yaml
+  - 31-ingress.yaml
