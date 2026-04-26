@@ -3,7 +3,7 @@ import json
 import random
 import re
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 from huggingface_hub import hf_hub_download
 from langchain_core.documents import Document as LCDocument
@@ -12,7 +12,7 @@ from llama_index.core import Document
 from omegaconf import DictConfig
 
 from src.chunking import chunk_documents, load_documents
-from src.config import get_collection_name
+from src.config import get_qdrant_collection_name
 from src.indexer import get_qdrant_client
 
 
@@ -128,7 +128,7 @@ def load_chunks_from_qdrant(
         Exception: При ошибке подключения к Qdrant или отсутствии коллекции.
     """
     client = get_qdrant_client(cfg)
-    collection_name = get_collection_name(cfg)
+    collection_name = get_qdrant_collection_name(cfg)
     chunks: list[LCDocument] = []
     offset = None
     limit = 100
@@ -313,6 +313,30 @@ def load_qa_dataset_from_jsonl(path: str | Path) -> list[dict[str, Any]]:
                 rec["evidence"] = row["evidence"]
             records.append(rec)
     return records
+
+
+def collect_gold_fingerprints_from_jsonl_paths(paths: Sequence[str | Path]) -> set[str]:
+    """
+    Объединение fingerprint из gold_contexts по списку JSONL (например валидационные датасеты).
+
+    Используется, чтобы не генерировать holdout-тест на тех же эталонных чанках.
+
+    Raises:
+        FileNotFoundError: если какой-либо из путей не существует или не файл.
+    """
+    out: set[str] = set()
+    for raw in paths:
+        path = Path(raw)
+        if not path.is_file():
+            raise FileNotFoundError(f"exclude JSONL not found: {path.resolve()}")
+        for rec in load_qa_dataset_from_jsonl(path):
+            for gc in rec.get("gold_contexts") or []:
+                if not isinstance(gc, dict):
+                    continue
+                fp = gc.get("fingerprint")
+                if fp:
+                    out.add(str(fp))
+    return out
 
 
 def load_qa_dataset_from_hf(

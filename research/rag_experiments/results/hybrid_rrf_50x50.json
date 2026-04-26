@@ -1,0 +1,22 @@
+{
+  "experiment_id": "hybrid_rrf_50x50",
+  "fusion": "rrf",
+  "dense_top_k": 50,
+  "sparse_top_k": 50,
+  "alpha": null,
+  "models": {
+    "embedding": "intfloat/multilingual-e5-base"
+  },
+  "retriever": {
+    "recall_at_k": 0.8283333333333335,
+    "precision_at_k": 0.11499999999999991,
+    "map_at_k": 0.6642566137566138,
+    "ndcg_at_k": 0.7254241612914766,
+    "hit_rate": 0.895,
+    "mean_query_ms": 558.5926735890098,
+    "std_query_ms": 32.30993293218036,
+    "p50_query_ms": 561.6687914880458,
+    "p95_query_ms": 603.2924482045928
+  },
+  "n_samples": 200
+}

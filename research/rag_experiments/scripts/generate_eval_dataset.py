@@ -8,6 +8,7 @@ from omegaconf import OmegaConf
 from src.config import get_cfg, paths_from_cfg
 from src.eval_data import (
     chunk_fingerprint,
+    collect_gold_fingerprints_from_jsonl_paths,
     is_good_chunk,
     load_chunks_for_eval,
     load_qa_dataset_from_jsonl,
@@ -66,12 +67,17 @@ def main(
     critic_only: bool = False,
     verbose: bool = False,
     overrides: str = "",
+    exclude_from: str = "",
 ) -> None:
     """Генерирует валидационный датасет (вопросы + эталоны) и сохраняет в JSONL.
 
     Для генерации под заданный размер чанка передайте overrides, например:
       --overrides "chunking.chunk_size=128 chunking.chunk_overlap=20"
     и укажите --out data/eval/eval_dataset_chunk128.jsonl
+
+    Holdout без пересечения с val: те же overrides и коллекция, другой --out и при желании
+    --seed; пути к val JSONL через пробел в кавычках:
+      --exclude_from "data/eval/eval_dataset_chunk128.jsonl"
     """
     overrides_list = [s.strip() for s in overrides.split() if s.strip()] if overrides else None
     cfg = get_cfg(overrides_list)
@@ -140,6 +146,33 @@ def main(
         print("No chunks loaded. Check Qdrant (if --source qdrant/auto) or DATA_DIR and manifest.")
         sys.exit(1)
 
+    external_excluded: set[str] = set()
+    exclude_paths_str = (exclude_from or "").strip()
+    if exclude_paths_str:
+        exclude_paths = [Path(p) for p in exclude_paths_str.split() if p.strip()]
+        try:
+            external_excluded = collect_gold_fingerprints_from_jsonl_paths(exclude_paths)
+        except FileNotFoundError as e:
+            print(str(e))
+            sys.exit(1)
+
+        n_before_exclude = len(chunks)
+        chunks = [
+            c for c in chunks
+            if chunk_fingerprint(c.page_content or "") not in external_excluded
+        ]
+        print(
+            f"  exclude_from: {len(exclude_paths)} file(s), "
+            f"{len(external_excluded)} unique gold fingerprint(s), "
+            f"{n_before_exclude} -> {len(chunks)} chunks after excluding overlap with val"
+        )
+        if len(chunks) == 0:
+            print(
+                "No chunks left after excluding validation fingerprints. "
+                "Increase --max_chunks or adjust --seed / source."
+            )
+            sys.exit(1)
+
     all_chunks = list(chunks)
     if resume and out_path.exists():
         existing_count = count_jsonl_lines(out_path)
@@ -156,10 +189,11 @@ def main(
             remaining_single / total_remaining if total_remaining > 0 else single_ratio_val
         )
 
+        forbidden_resume = used_fingerprints | external_excluded
         chunks_before = len(chunks)
         chunks_for_generate = [
             c for c in chunks
-            if chunk_fingerprint(c.page_content or "") not in used_fingerprints
+            if chunk_fingerprint(c.page_content or "") not in forbidden_resume
         ]
         excluded = chunks_before - len(chunks_for_generate)
 
@@ -247,9 +281,10 @@ def main(
             break
 
         effective_ratio = remaining_single / total_remaining
+        forbidden_refill = external_excluded | used_fingerprints
         chunks_filtered = [
             c for c in all_chunks
-            if chunk_fingerprint(c.page_content or "") not in used_fingerprints
+            if chunk_fingerprint(c.page_content or "") not in forbidden_refill
         ]
         if not chunks_filtered:
             print("\nНет чанков для добора после критика. Остановка.")

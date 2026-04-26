@@ -1,0 +1,22 @@
+{
+  "experiment_id": "retriever_dense",
+  "fusion": "dense",
+  "dense_top_k": null,
+  "sparse_top_k": null,
+  "alpha": null,
+  "models": {
+    "embedding": "intfloat/multilingual-e5-base"
+  },
+  "retriever": {
+    "recall_at_k": 0.8629166666666669,
+    "precision_at_k": 0.11800000000000005,
+    "map_at_k": 0.6572966269841269,
+    "ndcg_at_k": 0.7301821096489586,
+    "hit_rate": 0.95,
+    "mean_query_ms": 345.97209542029304,
+    "std_query_ms": 30.62348621936618,
+    "p50_query_ms": 335.41877049719915,
+    "p95_query_ms": 393.1896964699263
+  },
+  "n_samples": 200
+}

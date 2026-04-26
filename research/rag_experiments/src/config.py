@@ -26,6 +26,16 @@ def get_collection_name(cfg: DictConfig) -> str:
     return str(OmegaConf.select(cfg, "qdrant.collection_name", default="boardgame_rules_chunk512"))
 
 
+def get_qdrant_collection_name(cfg: DictConfig) -> str:
+    """Имя коллекции: при включённом hybrid-индексе можно задать отдельное имя (Phase 2)."""
+    if bool(OmegaConf.select(cfg, "qdrant.hybrid.enabled", default=False)):
+        alt = OmegaConf.select(cfg, "qdrant.hybrid.collection_name", default=None)
+        if alt is not None and str(alt).strip():
+            return str(alt).strip()
+
+    return get_collection_name(cfg)
+
+
 def paths_from_cfg(cfg: DictConfig) -> dict[str, Path]:
     manifest = OmegaConf.select(cfg, "data.manifest_path", default="manifests/index_manifest.csv")
     data_dir = OmegaConf.select(cfg, "data.data_dir", default="data/rules_texts_cleaned_good")

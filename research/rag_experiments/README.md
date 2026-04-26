@@ -9,7 +9,8 @@
   - `config.py` - загрузка конфигурации, пути через `paths_from_cfg`, определение девайса.
   - `chunking.py` - загрузка документов и разбиение на чанки.
   - `indexer.py` - создание эмбеддингов и индексация в Qdrant.
-  - `retriever.py` - семантический поиск релевантных чанков.
+  - `retriever.py` - dense/hybrid поиск релевантных чанков, metadata filter и two-stage reranking.
+  - `hybrid_fusion.py` - реализация RRF-fusion для hybrid retrieval.
   - `generator.py` - генерация ответов с помощью LLM на основе найденного контекста.
   - `eval_data.py` - загрузка QA-датасета (JSONL / Hugging Face), чанки для оценки.
   - `eval.py` - `run_full_evaluation` и `run_retriever_evaluation`; параметр `dataset_hf_filename` для указания файла датасета в HF.
@@ -50,7 +51,8 @@
 
 Эти `source_*` колонки не используются скриптами из `research/rag_experiments` и не влияют на индексацию в Qdrant.
 
-Датасет для оценки RAG на Hugging Face: [LHLHLHE/boardgame_rules_qa_dataset_ru](https://huggingface.co/datasets/LHLHLHE/boardgame_rules_qa_dataset_ru) - файлы `boardgame_rules_qa_dataset_ru_chunk512.jsonl`, `boardgame_rules_qa_dataset_ru_chunk128.jsonl` (и при необходимости другие размеры).
+Датасет для оценки RAG на Hugging Face: [LHLHLHE/boardgame_rules_qa_dataset_ru](https://huggingface.co/datasets/LHLHLHE/boardgame_rules_qa_dataset_ru) -
+файлы `boardgame_rules_qa_dataset_ru_chunk512.jsonl`, `boardgame_rules_qa_dataset_ru_chunk256.jsonl`, `boardgame_rules_qa_dataset_ru_chunk128.jsonl` и тестовый файл `boardgame_rules_qa_test_dataset_ru_chunk128.jsonl`.
 
 ## Пайплайны
 
@@ -75,6 +77,8 @@ python -m scripts.prepare_chunk_datasets_and_collections --chunk_sizes "128,512"
 2. Эмбеддинги.
 3. Сохранение векторов в Qdrant с метаданными: `source_doc_id`, `game_titles`, `lang`.
 
+**Hybrid-индекс:** поставьте `qdrant.hybrid.enabled=true` и отдельное `qdrant.hybrid.collection_name` (например `boardgame_rules_hybrid_chunk128`), затем `python -m scripts.index_documents --recreate` с соответствующими overrides. Коллекция создаётся через `QdrantVectorStore` (dense `text-dense` + sparse `text-sparse-new`).
+
 ### Генерация QA-датасета (`generate_eval_dataset.py`)
 
 Генерирует сэмплы с вопросами, эталонными ответами и контекстами. Запуск: `python -m scripts.generate_eval_dataset` (опции через Fire, см. `--help`).
@@ -93,31 +97,72 @@ python -m scripts.prepare_chunk_datasets_and_collections --chunk_sizes "128,512"
 
 Запуск скрипта: `python -m scripts.run_evaluation`. Поддержка Hydra overrides: `--overrides "retrieval.top_k=10"` или `--overrides "retrieval.top_k=10 llm.model=qwen2.5:1.5b"`. В ноутбуках используется `run_full_evaluation` и `run_retriever_evaluation` из `src/eval`.
 
+## Экспериментальный ноутбук `04_phase1_experiments.ipynb`
+
+Основной ноутбук с поэтапными экспериментами сейчас объединяет подбор ретривера и генератора в 8 этапов:
+
+1. `top_k × chunk_size`: сравнение `top_k ∈ {3, 5, 7, 10}` и chunk size `128/256/512`.
+2. Модель эмбеддера при выбранных `top_k=10`, `chunk_size=128`.
+3. Metadata filter по `game_titles`.
+4. Two-stage retrieval с реранкером.
+5. Сетка `first_stage_k × second_stage_k` для two-stage.
+6. Hybrid retrieval: dense baseline, RRF и weighted hybrid.
+7. Модель генератора (`qwen2.5:1.5b`, `qwen2.5:7b-instruct`, `qwen3:8b`).
+8. Температура генерации (`0.0`, `0.1`, `0.2`, `0.3`) с тремя прогонами на каждую температуру.
+
+Текущая финальная конфигурация по результатам ноутбука:
+
+- `BEST_CHUNK_SIZE = 128`, `BEST_TOP_K = 10`
+- эмбеддер: `intfloat/multilingual-e5-base`
+- `retrieval.use_metadata_filter = true`
+- two-stage retrieval не используется (`retrieval.two_stage = false`)
+- hybrid retrieval: формальный winner `hybrid_weighted_50x50_a07`, практический выбор для генеративных этапов `SELECTED_HYBRID_ID = "hybrid_weighted_20x20_a07"`
+- LLM: `qwen2.5:7b-instruct`
+- температура: `0.0`
+
+Финальное сравнение с baseline (`qwen2.5:1.5b`, dense retrieval, chunk512) показывает рост retrieval-метрик, ROUGE recall и LLM-judge качества:
+
+- `recall_at_k`: `0.693 -> 0.886`
+- `map_at_k`: `0.533 -> 0.724`
+- `ndcg_at_k`: `0.586 -> 0.784`
+- `hit_rate`: `0.750 -> 0.955`
+- `rouge1_recall`: `0.613 -> 0.782`
+- `rouge2_recall`: `0.398 -> 0.540`
+- `llm_faithfulness`: `0.756 -> 0.813`
+- `llm_correctness`: `0.655 -> 0.799`
+
+Не все автоматические метрики генерации растут одновременно: `rougeL_f1` и `semantic_similarity` в финальном сравнении немного ниже baseline, поэтому итоговый выбор опирается на совокупность retrieval-метрик, ROUGE recall и LLM-judge, а не на одну отдельную метрику.
+
 ## Конфигурация
 
 Параметры задаются через **Hydra** и YAML в `configs/`. Главный файл - `configs/config.yaml`, в нём подключаются секции data, qdrant, embedding, chunking, llm, eval_llm, retrieval, eval.
 
 Основные секции и типичные ключи:
 
-| Секция / ключ                    | Пример значения                              | Описание                                |
-|----------------------------------|----------------------------------------------|-----------------------------------------|
-| `embedding.model`                | `intfloat/multilingual-e5-base`              | Модель эмбеддингов                      |
-| `embedding.text_instruction`     | `passage: ` / `search_document: `            | Префикс для текстов (E5 / RoSBERTa)     |
-| `embedding.query_instruction`    | `query: ` / `search_query: `                 | Префикс для запросов (E5 / RoSBERTa)    |
-| `chunking.chunk_size`            | `512`                                        | Размер чанка в токенах                  |
-| `chunking.chunk_overlap`         | `80`                                         | Перекрытие чанков                       |
-| `retrieval.top_k`                | `5`                                          | Количество чанков для ретривера         |
-| `retrieval.use_metadata_filter`  | `false`                                      | Фильтрация по `game_titles`             |
-| `retrieval.two_stage`            | `false`                                      | Двухстадийный поиск с раранкером        |
-| `retrieval.first_stage_k`        | `20`                                         | Число кандидатов до раранкера           |
-| `retrieval.second_stage_k`       | `10`                                         | Число чанков после раранкера            |
-| `retrieval.reranker_model`       | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | Модель раранкера                        |
-| `llm.provider`                   | `ollama`                                     | Провайдер LLM                           |
-| `llm.model`                      | `qwen2.5:1.5b`                               | Модель LLM                              |
-| `llm.temperature`                | `0.0`                                        | Температура генерации                   |
-| `eval.semantic_similarity_model` | `ai-forever/ru-en-RoSBERTa`                  | Модель для семантической оценки ответов |
-| `eval.multi_chunks_min`          | `2`                                          | Минимум чанков в multi-hop вопросе      |
-| `eval.multi_chunks_max`          | `3`                                          | Максимум чанков в multi-hop вопросе     |
+| Секция / ключ                          | Пример значения                              | Описание                                                                                                              |
+|----------------------------------------|----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| `embedding.model`                      | `intfloat/multilingual-e5-base`              | Модель эмбеддингов                                                                                                    |
+| `embedding.text_instruction`           | `passage: ` / `search_document: `            | Префикс для текстов (E5 / RoSBERTa)                                                                                   |
+| `embedding.query_instruction`          | `query: ` / `search_query: `                 | Префикс для запросов (E5 / RoSBERTa)                                                                                  |
+| `chunking.chunk_size`                  | `512`                                        | Размер чанка в токенах                                                                                                |
+| `chunking.chunk_overlap`               | `80`                                         | Перекрытие чанков                                                                                                     |
+| `retrieval.top_k`                      | `5`                                          | Количество чанков для ретривера                                                                                       |
+| `retrieval.mode`                       | `dense` / `hybrid`                           | Режим извлечения                                                                                                      |
+| `retrieval.use_metadata_filter`        | `false`                                      | Фильтрация по `game_titles`                                                                                           |
+| `retrieval.two_stage`                  | `false`                                      | Двухстадийный поиск с реранкером                                                                                      |
+| `retrieval.first_stage_k`              | `100`                                        | Число кандидатов до реранкера                                                                                         |
+| `retrieval.second_stage_k`             | `10`                                         | Число чанков после реранкера                                                                                          |
+| `retrieval.reranker_model`             | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | Модель реранкера                                                                                                      |
+| `qdrant.hybrid.enabled`                | `true` / `false`                             | Схема коллекции: dense+sparse (FastEmbed / Qdrant)                                                                    |
+| `qdrant.hybrid.collection_name`        | например `boardgame_rules_hybrid_chunk128`   | Отдельная коллекция от dense-only; при `null` - `qdrant.collection_name`                                              |
+| `qdrant.hybrid.fastembed_sparse_model` | `Qdrant/bm25`                                | Имя sparse-модели FastEmbed при индексации/загрузке `QdrantVectorStore`                                               |
+| `retrieval.hybrid.fusion`              | `rrf` / `weighted`                           | Слияние списков dense+sparse: RRF (наша реализация) или `relative_score_fusion` (alpha)                               |
+| `llm.provider`                         | `ollama`                                     | Провайдер LLM                                                                                                         |
+| `llm.model`                            | `qwen2.5:1.5b`                               | Модель LLM                                                                                                            |
+| `llm.temperature`                      | `0.0`                                        | Температура генерации                                                                                                 |
+| `eval.semantic_similarity_model`       | `ai-forever/ru-en-RoSBERTa`                  | Модель для семантической оценки ответов                                                                               |
+| `eval.multi_chunks_min`                | `2`                                          | Минимум чанков в multi-hop вопросе                                                                                    |
+| `eval.multi_chunks_max`                | `3`                                          | Максимум чанков в multi-hop вопросе                                                                                   |
 
 Точные ключи и значения см. в файлах в `configs/`.
 
