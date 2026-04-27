@@ -4,6 +4,7 @@ from typing import Any
 from llama_index.core import Settings, VectorStoreIndex
 from llama_index.core.vector_stores import (FilterCondition, FilterOperator, MetadataFilter,
                                             MetadataFilters)
+from llama_index.core.vector_stores.types import VectorStoreQueryMode
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.postprocessor.sbert_rerank import SentenceTransformerRerank
 from llama_index.vector_stores.qdrant import QdrantVectorStore
@@ -29,6 +30,7 @@ class Retriever:
         self._api_base = cfg.embedding.api_base
         self._embedding_model = cfg.embedding.model
         self._top_k = top_k if top_k is not None else cfg.retrieval.top_k
+        self._retrieval_mode = cfg.retrieval.mode
         self._use_metadata_filter = (
             use_metadata_filter
             if use_metadata_filter is not None
@@ -79,6 +81,13 @@ class Retriever:
             condition=FilterCondition.AND,
         )
 
+    def _hybrid_branch_top_ks(self, out_top_k: int) -> tuple[int, int, int]:
+        """(dense_top_k, sparse_top_k, hybrid_top_k) for VectorIndexRetriever."""
+        hcfg = rag_config.retrieval.hybrid
+        d_k = max(out_top_k, hcfg.dense_top_k)
+        s_k = max(out_top_k, hcfg.sparse_top_k)
+        return d_k, s_k, out_top_k
+
     def _build_retriever(
         self,
         similarity_top_k: int,
@@ -93,13 +102,45 @@ class Retriever:
             kwargs["node_postprocessors"] = node_postprocessors
         return self._index.as_retriever(**kwargs)
 
+    def _build_hybrid_retriever(
+        self,
+        similarity_top_k: int,
+        sparse_top_k: int,
+        hybrid_top_k: int,
+        alpha: float,
+        filters: MetadataFilters | None,
+        node_postprocessors: list[Any] | None = None,
+    ):
+        kwargs: dict[str, Any] = {
+            "vector_store_query_mode": VectorStoreQueryMode.HYBRID,
+            "similarity_top_k": similarity_top_k,
+            "sparse_top_k": sparse_top_k,
+            "hybrid_top_k": hybrid_top_k,
+            "alpha": alpha,
+            "filters": filters,
+        }
+        if node_postprocessors:
+            kwargs["node_postprocessors"] = node_postprocessors
+
+        return self._index.as_retriever(**kwargs)
+
     def _get_retriever(self, game_id: int | None):
         """Build retriever filtered by ``game_id`` when metadata filter is enabled."""
-        similarity_top_k = self._first_stage_k if self._two_stage else self._top_k
+        out_k = self._first_stage_k if self._two_stage else self._top_k
         filters = self._get_metadata_filters(game_id)
         node_postprocessors = [self._reranker] if self._two_stage and self._reranker else None
+
+        if self._retrieval_mode == "hybrid":
+            d_k, s_k, h_k = self._hybrid_branch_top_ks(out_k)
+            alpha = rag_config.retrieval.hybrid.alpha
+            return self._build_hybrid_retriever(
+                d_k, s_k, h_k,
+                alpha, filters,
+                node_postprocessors=node_postprocessors
+            )
+
         return self._build_retriever(
-            similarity_top_k,
+            out_k,
             filters,
             node_postprocessors=node_postprocessors,
         )
@@ -122,8 +163,9 @@ class Retriever:
         nodes = await retriever.aretrieve(augmented_query)
 
         logger.debug(
-            "[RAG] retrieval game_id=%s nodes=%s augmented_query_preview=%r",
+            "[RAG] retrieval game_id=%s mode=%s nodes=%s augmented_query_preview=%r",
             game_id,
+            self._retrieval_mode,
             len(nodes),
             truncate_for_log(augmented_query, app_config.rag_log_max_chars),
         )

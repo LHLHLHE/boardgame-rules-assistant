@@ -5,12 +5,12 @@ from llama_index.core import Document, Settings, StorageContext, VectorStoreInde
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import TextNode
 from llama_index.embeddings.openai import OpenAIEmbedding
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.models import Distance, VectorParams
 
-from boardgame_rules_backend.connectors import (QDRANT_COLLECTION,
-                                                delete_points_by_rules_document_id,
+from boardgame_rules_backend.connectors import (delete_points_by_rules_document_id,
                                                 get_qdrant_async_client, get_qdrant_client,
-                                                get_qdrant_vector_store)
+                                                get_qdrant_collection_name, get_qdrant_vector_store)
 from boardgame_rules_backend.settings import rag_config
 
 # Qdrant accepts point IDs as uint or UUID only.
@@ -70,6 +70,9 @@ class Indexer:
 
         Idempotent for the same rules row: removes existing points for ``rules_document_id``,
         then inserts with stable UUID node ids per (rules_document_id, chunk index).
+
+        Hybrid index: collection schema (dense + sparse) is created on first insert by
+        ``QdrantVectorStore``; do not call ``create_collection`` with a single vector.
         """
         if not chunks:
             return
@@ -79,16 +82,30 @@ class Indexer:
             raise ValueError("chunks must include rules_document_id in metadata")
 
         client = get_qdrant_client()
-        try:
-            client.get_collection(QDRANT_COLLECTION)
-        except Exception:
-            client.create_collection(
-                collection_name=QDRANT_COLLECTION,
-                vectors_config=VectorParams(
-                    size=rag_config.embedding.dim,
-                    distance=Distance.COSINE,
-                ),
-            )
+        collection_name = get_qdrant_collection_name()
+
+        if not rag_config.qdrant.hybrid_enabled:
+            try:
+                client.get_collection(collection_name)
+            except UnexpectedResponse as e:
+                if e.status_code == 404:
+                    client.create_collection(
+                        collection_name=collection_name,
+                        vectors_config=VectorParams(
+                            size=rag_config.embedding.dim,
+                            distance=Distance.COSINE,
+                        ),
+                    )
+                else:
+                    raise
+            except Exception:
+                client.create_collection(
+                    collection_name=collection_name,
+                    vectors_config=VectorParams(
+                        size=rag_config.embedding.dim,
+                        distance=Distance.COSINE,
+                    ),
+                )
 
         delete_points_by_rules_document_id(int(rules_document_id))
 

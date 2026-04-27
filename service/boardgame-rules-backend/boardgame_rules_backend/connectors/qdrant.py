@@ -1,15 +1,40 @@
 import logging
+from functools import partial
 from typing import Any
 
 from llama_index.vector_stores.qdrant import QdrantVectorStore
+from llama_index.vector_stores.qdrant.utils import relative_score_fusion
 from qdrant_client import AsyncQdrantClient, QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
+from qdrant_client.http.models import Distance, VectorParams
 
-from boardgame_rules_backend.settings import app_config
+from boardgame_rules_backend.connectors.hybrid_fusion import rrf_fusion
+from boardgame_rules_backend.settings import app_config, rag_config
 
 logger = logging.getLogger(__name__)
 
-QDRANT_COLLECTION = "boardgame_rules"
+
+def get_qdrant_collection_name() -> str:
+    """Active Qdrant collection (from RAG config)."""
+    return rag_config.qdrant.collection_name
+
+
+def _select_hybrid_fusion_fn() -> Any:
+    fusion = rag_config.retrieval.hybrid.fusion.lower()
+    rrf_k = rag_config.retrieval.hybrid.rrf_k
+    if fusion in {"rrf", "reciprocal"}:
+        return partial(rrf_fusion, rrf_k=rrf_k)
+    if fusion in {"weighted", "score", "relative"}:
+        return relative_score_fusion
+
+    raise ValueError(f"Unknown retrieval.hybrid.fusion={fusion!r}; use 'rrf' or 'weighted'.")
+
+
+def _dense_vector_params() -> VectorParams:
+    return VectorParams(
+        size=rag_config.embedding.dim,
+        distance=Distance.COSINE,
+    )
 
 
 def payload_matches_rules_document_id(
@@ -39,12 +64,13 @@ def delete_points_by_rules_document_id(rules_document_id: int) -> int:
     Scrolls the collection and deletes points whose payload references rules_document_id.
     """
     client = get_qdrant_client()
+    collection = get_qdrant_collection_name()
     deleted = 0
     offset = None
     while True:
         try:
             records, next_offset = client.scroll(
-                collection_name=QDRANT_COLLECTION,
+                collection_name=collection,
                 limit=256,
                 offset=offset,
                 with_payload=True,
@@ -61,7 +87,7 @@ def delete_points_by_rules_document_id(rules_document_id: int) -> int:
             if payload_matches_rules_document_id(p.payload, rules_document_id)
         ]
         if ids_batch:
-            client.delete(collection_name=QDRANT_COLLECTION, points_selector=ids_batch)
+            client.delete(collection_name=collection, points_selector=ids_batch)
             deleted += len(ids_batch)
         offset = next_offset
         if offset is None:
@@ -77,7 +103,7 @@ def delete_qdrant_collection_best_effort() -> None:
     """Drop the rules collection; ignore 404."""
     client = get_qdrant_client()
     try:
-        client.delete_collection(collection_name=QDRANT_COLLECTION)
+        client.delete_collection(collection_name=get_qdrant_collection_name())
     except UnexpectedResponse as e:
         if e.status_code == 404:
             return
@@ -99,8 +125,27 @@ def get_qdrant_async_client() -> AsyncQdrantClient:
 
 
 def get_qdrant_vector_store(client, aclient) -> QdrantVectorStore:
+    collection_name = get_qdrant_collection_name()
+    qh = rag_config.qdrant.hybrid
+
+    if not rag_config.qdrant.hybrid_enabled:
+        return QdrantVectorStore(
+            client=client,
+            aclient=aclient,
+            collection_name=collection_name,
+        )
+
+    dense_name = qh.dense_vector_name
+    sparse_name = qh.sparse_vector_name
     return QdrantVectorStore(
         client=client,
         aclient=aclient,
-        collection_name=QDRANT_COLLECTION,
+        collection_name=collection_name,
+        enable_hybrid=True,
+        fastembed_sparse_model=qh.fastembed_sparse_model,
+        batch_size=qh.batch_size,
+        dense_config=_dense_vector_params(),
+        hybrid_fusion_fn=_select_hybrid_fusion_fn(),
+        dense_vector_name=str(dense_name) if dense_name else None,
+        sparse_vector_name=str(sparse_name) if sparse_name else None,
     )
