@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import BotCommand
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 
@@ -22,6 +23,15 @@ dp.include_router(router)
 
 
 async def on_startup(app: web.Application) -> None:
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="открыть главное меню"),
+            BotCommand(command="help", description="как пользоваться ботом"),
+            BotCommand(command="info", description="список команд"),
+            BotCommand(command="ask", description="выбрать игру и задать вопрос"),
+            BotCommand(command="cancel", description="отменить текущий сценарий"),
+        ]
+    )
     base_url = await resolve_webhook_base_url()
     webhook_url = f"{base_url.rstrip('/')}{settings.webhook_path}"
     await bot.set_webhook(
