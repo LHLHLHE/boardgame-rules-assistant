@@ -31,6 +31,29 @@
 - `results/` - сохранённые результаты оценки.
 - `docker-compose.yml` - конфигурация Qdrant контейнера.
 
+## Окружение и запуск
+
+Зависимости исследовательского контура описаны в `research/pyproject.toml` и рассчитаны на Python `3.11.*`.
+Команды ниже предполагают запуск из корня репозитория:
+
+```bash
+cd research
+uv sync
+
+cd rag_experiments
+docker compose up -d
+```
+
+Qdrant после запуска доступен на `localhost:6333` (REST API) и `localhost:6334` (gRPC), что соответствует настройкам `configs/qdrant/qdrant.yaml`.
+Для LLM по умолчанию используется Ollama: провайдер и модель задаются в `configs/llm/llm.yaml`.
+
+После подготовки данных и манифеста скрипты можно запускать через `uv run`, например:
+
+```bash
+uv run python -m scripts.index_documents
+uv run python -m scripts.run_evaluation
+```
+
 ## Данные и пути
 
 Пути задаются в конфиге и доступны через `paths_from_cfg(cfg)` (манифест, каталоги данных, датасеты для оценки).

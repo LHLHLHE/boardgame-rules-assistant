@@ -87,15 +87,15 @@
 ## Прод-развертывание на одной VM (Docker Compose)
 
 - `docker-compose.yml` - сервисы backend, bot, celery, postgres, redis, qdrant, minio, nginx и certbot.
-- `nginx.prod.conf.template` - маршрутизация `/api`, `/webhook`, `/`; статика админ-панели раздается напрямую самим nginx (копируется из `ADMIN_FRONTEND_IMAGE` в volume).
-- `.env.compose.example` - шаблон переменных окружения.
+- `nginx.conf.template` - маршрутизация `/api`, `/webhook`, `/`; статика админ-панели раздается напрямую самим nginx (копируется из `ADMIN_FRONTEND_IMAGE` в volume).
+- `.env.prod.template` - шаблон переменных окружения.
 - Для серверного сценария без исходников используются готовые образы (`BACKEND_IMAGE`, `BOT_IMAGE`, `ADMIN_FRONTEND_IMAGE`).
 
 ### 1) Подготовка переменных
 
 ```bash
 cd service/infra
-cp .env.compose.example .env
+cp .env.prod.template .env
 ```
 
 Обязательно проверьте в `.env`:
