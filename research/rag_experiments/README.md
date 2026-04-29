@@ -15,7 +15,7 @@
   - `eval_data.py` - загрузка QA-датасета (JSONL / Hugging Face), чанки для оценки.
   - `eval.py` - `run_full_evaluation` и `run_retriever_evaluation`; параметр `dataset_hf_filename` для указания файла датасета в HF.
   - `generation_eval.py` - оценка генерации: chrF++, ROUGE, семантическая близость, LLM-as-judge.
-  - `retriever_eval.py` - оценка ретривера: recall, precision@k, NDCG@k, hit rate.
+  - `retriever_eval.py` - оценка ретривера: recall, precision@k, MAP@k, NDCG@k, hit rate.
   - `qa_dataset_generator.py` - генерация QA-датасета по чанкам.
 - `scripts/`
   - `build_manifest.py` - построение манифеста документов для индексации.
