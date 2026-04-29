@@ -145,16 +145,20 @@ python -m scripts.prepare_chunk_datasets_and_collections --chunk_sizes "128,512"
 
 Финальное сравнение с baseline (`qwen2.5:1.5b`, dense retrieval, chunk512) показывает рост retrieval-метрик, ROUGE recall и LLM-judge качества:
 
-- `recall_at_k`: `0.693 -> 0.886`
-- `map_at_k`: `0.533 -> 0.724`
-- `ndcg_at_k`: `0.586 -> 0.784`
-- `hit_rate`: `0.750 -> 0.955`
-- `rouge1_recall`: `0.613 -> 0.782`
-- `rouge2_recall`: `0.398 -> 0.540`
-- `llm_faithfulness`: `0.756 -> 0.813`
-- `llm_correctness`: `0.655 -> 0.799`
+- **Recall@k**: 0.693 → **0.886** (+0.193)
+- **MAP@k**: 0.533 → **0.724** (+0.191)
+- **nDCG@k**: 0.586 → **0.784** (+0.198)
+- **Hit rate**: 0.750 → **0.955** (+0.205)
+- **ChrF++**: 0.344 → **0.348** (+0.004)
+- **ROUGE-1 recall**: 0.613 → **0.782** (+0.169)
+- **ROUGE-2 recall**: 0.398 → **0.540** (+0.142)
+- **ROUGE-L F1**: 0.263 → **0.255** (-0.008)
+- **Semantic similarity**: 0.700 → **0.672** (-0.028)
+- **LLM faithfulness**: 0.756 → **0.813** (+0.057)
+- **LLM answer relevance**: 0.666 → **0.721** (+0.055)
+- **LLM correctness**: 0.655 → **0.799** (+0.144)
 
-Не все автоматические метрики генерации растут одновременно: `rougeL_f1` и `semantic_similarity` в финальном сравнении немного ниже baseline, поэтому итоговый выбор опирается на совокупность retrieval-метрик, ROUGE recall и LLM-judge, а не на одну отдельную метрику.
+Не все автоматические метрики генерации растут одновременно: ROUGE-L F1 и Semantic similarity в финальном сравнении немного ниже baseline, поэтому итоговый выбор опирается на совокупность retrieval-метрик, ROUGE recall и LLM-judge, а не на одну отдельную метрику.
 
 ## Конфигурация
 
