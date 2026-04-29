@@ -87,9 +87,9 @@ docker compose up -d --build
 
 ## Документация по разделам
 
-- [service/README.md](service/README.md) - запуск и эксплуатация сервиса, dev/prod-инфраструктура, API и Telegram-сценарии.
 - [research/data_work/README.md](research/data_work/README.md) - подготовка данных, очистка текстов правил, идентификаторы и хэши документов.
 - [research/rag_experiments/README.md](research/rag_experiments/README.md) - RAG-пайплайны, конфигурация Hydra, Qdrant, метрики и результаты экспериментов.
+- [service/README.md](service/README.md) - запуск и эксплуатация сервиса, dev/prod-инфраструктура, API и Telegram-сценарии.
 
 ## Лицензия
 
