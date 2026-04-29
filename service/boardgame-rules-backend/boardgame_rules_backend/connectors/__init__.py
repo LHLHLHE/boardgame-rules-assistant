@@ -7,9 +7,10 @@ from boardgame_rules_backend.connectors.redis import get_redis_client
 from boardgame_rules_backend.connectors.s3 import (delete_all_objects_under_prefix_best_effort,
                                                    delete_s3_objects_best_effort,
                                                    download_rules_file, ensure_bucket_exists,
-                                                   get_s3_client, put_rules_content,
-                                                   rules_storage_key, source_content_type,
-                                                   upload_rules_file, upload_source_file)
+                                                   get_s3_client, processed_rules_key,
+                                                   put_rules_content, source_content_type,
+                                                   source_storage_key, upload_rules_file,
+                                                   upload_source_file)
 
 __all__ = [
     # Redis
@@ -17,7 +18,8 @@ __all__ = [
     # S3
     "get_s3_client",
     "ensure_bucket_exists",
-    "rules_storage_key",
+    "source_storage_key",
+    "processed_rules_key",
     "source_content_type",
     "upload_rules_file",
     "upload_source_file",

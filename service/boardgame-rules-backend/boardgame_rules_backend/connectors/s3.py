@@ -12,8 +12,11 @@ from boardgame_rules_backend.settings import app_config
 
 logger = logging.getLogger(__name__)
 
-# All rules objects live under this prefix.
+# Full wipe deletes everything under this prefix (sources + processed).
 RULES_S3_PREFIX = "rules/"
+
+RULES_SOURCES_PREFIX = "rules/sources/by-hash/"
+RULES_PROCESSED_PREFIX = "rules/processed/by-hash/"
 
 
 def get_s3_client() -> BaseClient:
@@ -35,10 +38,20 @@ def ensure_bucket_exists() -> None:
             client.create_bucket(Bucket=app_config.s3_bucket)
 
 
-def rules_storage_key(doc_id: str, extension: str = "txt") -> str:
-    """Content-addressed key shared across games when rules file bytes match."""
+def source_storage_key(doc_id: str, extension: str = "bin") -> str:
+    """
+    S3 key for uploaded originals (PDF/TXT).
+
+    Content-addressed; shared across games when bytes match.
+    """
+    ext = extension.lstrip(".").lower() if extension else "bin"
+    return f"{RULES_SOURCES_PREFIX}{doc_id}.{ext}"
+
+
+def processed_rules_key(doc_id: str, extension: str = "txt") -> str:
+    """S3 key for preprocessed rules text (and manifest texts). Content-addressed."""
     ext = extension.lstrip(".").lower() if extension else "txt"
-    return f"{RULES_S3_PREFIX}by-hash/{doc_id}.{ext}"
+    return f"{RULES_PROCESSED_PREFIX}{doc_id}.{ext}"
 
 
 def source_content_type(filename: str) -> str:
@@ -54,7 +67,7 @@ def upload_rules_file(content: bytes, filename: str) -> tuple[str, str]:
     """Upload rules file to S3 (content-addressed key)."""
     doc_id = hashlib.sha256(content).hexdigest()
     ext = filename.rsplit(".", 1)[-1] if "." in filename else "txt"
-    s3_key = rules_storage_key(doc_id, ext)
+    s3_key = processed_rules_key(doc_id, ext)
 
     client = get_s3_client()
     ensure_bucket_exists()
@@ -71,7 +84,7 @@ def upload_source_file(content: bytes, filename: str) -> tuple[str, str]:
     """Upload original source file to S3 using content-addressed key."""
     doc_id = hashlib.sha256(content).hexdigest()
     ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
-    s3_key = rules_storage_key(doc_id, ext)
+    s3_key = source_storage_key(doc_id, ext)
 
     client = get_s3_client()
     ensure_bucket_exists()
