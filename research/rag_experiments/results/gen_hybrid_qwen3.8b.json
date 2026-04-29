@@ -1,0 +1,30 @@
+{
+  "models": {
+    "generation": "qwen3:8b",
+    "embedding": "intfloat/multilingual-e5-base",
+    "semantic_eval": "ai-forever/ru-en-RoSBERTa",
+    "llm_judge": "qwen2.5:7b-instruct"
+  },
+  "retriever": {},
+  "pipeline": {
+    "chrfpp": 0.24434734957460225,
+    "rouge1_recall": 0.49545038028893523,
+    "rouge2_recall": 0.3455486337492916,
+    "rougeL_f1": 0.1805886480662862,
+    "semantic_similarity": 0.6453387854749346,
+    "llm_faithfulness": 0.8731617647058824,
+    "llm_answer_relevance": 0.75,
+    "llm_correctness": 0.8156934306569343,
+    "llm_judge_errors": 0.0,
+    "llm_n_scored_faithfulness": 136.0,
+    "llm_n_scored_relevance": 137.0,
+    "llm_n_scored_correctness": 137.0,
+    "llm_n_na_faithfulness": 64.0,
+    "llm_n_na_relevance": 63.0,
+    "llm_n_na_correctness": 63.0
+  },
+  "n_samples": 200,
+  "n_evaluated": 200,
+  "errors": 0,
+  "llm_judge_errors": 0.0
+}

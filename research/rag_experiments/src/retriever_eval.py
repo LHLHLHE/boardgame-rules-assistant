@@ -1,6 +1,8 @@
 import math
+import time
 from typing import Any
 
+import numpy as np
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
@@ -97,10 +99,28 @@ class RetrieverEvaluator:
 
         return {"recall": recall, "precision": precision, "ap": ap, "ndcg": ndcg, "hit": hit_rate}
 
+    @staticmethod
+    def _aggregate_query_times_ms(seconds: list[float]) -> dict[str, float]:
+        if not seconds:
+            return {
+                "mean_query_ms": float("nan"),
+                "std_query_ms": float("nan"),
+                "p50_query_ms": float("nan"),
+                "p95_query_ms": float("nan"),
+            }
+        arr = np.asarray(seconds, dtype=np.float64) * 1000.0
+        return {
+            "mean_query_ms": float(np.mean(arr)),
+            "std_query_ms": float(np.std(arr, ddof=0)),
+            "p50_query_ms": float(np.percentile(arr, 50)),
+            "p95_query_ms": float(np.percentile(arr, 95)),
+        }
+
     def evaluate(
         self,
         dataset: list[dict[str, Any]],
         limit: int | None = None,
+        time_retrieval: bool = False,
     ) -> dict[str, float]:
         """
         Оценивает retriever на QA датасете.
@@ -108,18 +128,27 @@ class RetrieverEvaluator:
         При two_stage=True метрики считаются при k=second_stage_k (финальное число
         результатов после реранкера), иначе - при k=top_k.
 
+        Args:
+            time_retrieval: при True замеряет wall-time `retrieve` на вопрос и добавляет
+                mean/std/p50/p95 в миллисекундах (только в возвращаемом dict).
+
         Returns:
-            recall_at_k, precision_at_k, ndcg_at_k, hit_rate.
+            recall_at_k, precision_at_k, map_at_k, ndcg_at_k, hit_rate;
+            при time_retrieval ещё mean_query_ms, std_query_ms, p50_query_ms, p95_query_ms.
         """
         samples = dataset[:limit] if limit is not None else dataset
         if not samples:
-            return {
+            out = {
                 "recall_at_k": 0.0,
                 "precision_at_k": 0.0,
                 "map_at_k": 0.0,
                 "ndcg_at_k": 0.0,
                 "hit_rate": 0.0
             }
+            if time_retrieval:
+                out.update(self._aggregate_query_times_ms([]))
+
+            return out
 
         two_stage = bool(OmegaConf.select(self.cfg, "retrieval.two_stage", default=False))
         eval_k = (
@@ -129,6 +158,7 @@ class RetrieverEvaluator:
         )
 
         recs, precs, aps, ndcgs, hits = [], [], [], [], []
+        query_times_s: list[float] = []
         for row in tqdm(samples, desc="Retriever eval", unit="samp"):
             query = row.get("question") or row.get("user_input", "")
             if not query:
@@ -137,7 +167,13 @@ class RetrieverEvaluator:
             gold_fps = get_gold_fingerprints(row)
             game_title = (row.get("game_title") or "").strip() or None
             game_titles = [game_title] if game_title else None
-            results = self.retriever.retrieve(query, top_k=self.top_k, game_titles=game_titles)
+            if time_retrieval:
+                t0 = time.perf_counter()
+                results = self.retriever.retrieve(query, top_k=self.top_k, game_titles=game_titles)
+                query_times_s.append(time.perf_counter() - t0)
+            else:
+                results = self.retriever.retrieve(query, top_k=self.top_k, game_titles=game_titles)
+
             m = self.compute_retrieval_metrics_for_sample(results, gold_fps, eval_k)
             recs.append(m["recall"])
             precs.append(m["precision"])
@@ -146,10 +182,14 @@ class RetrieverEvaluator:
             hits.append(m["hit"])
 
         n = len(recs)
-        return {
+        out: dict[str, float] = {
             "recall_at_k": sum(recs) / n if n else 0.0,
             "precision_at_k": sum(precs) / n if n else 0.0,
             "map_at_k": sum(aps) / n if n else 0.0,
             "ndcg_at_k": sum(ndcgs) / n if n else 0.0,
             "hit_rate": sum(hits) / n if n else 0.0,
         }
+        if time_retrieval:
+            out.update(self._aggregate_query_times_ms(query_times_s))
+
+        return out

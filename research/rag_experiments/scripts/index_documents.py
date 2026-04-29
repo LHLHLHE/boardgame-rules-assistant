@@ -14,6 +14,8 @@ def main(
 
     Для индексации под заданный размер чанка и коллекцию передайте overrides, например:
       --overrides "chunking.chunk_size=128 qdrant.collection_name=boardgame_rules_chunk128"
+    Hybrid (Qdrant sparse + dense) и отдельная коллекция:
+      --overrides "qdrant.hybrid.enabled=true qdrant.hybrid.collection_name=boardgame_rules_hybrid_chunk128 ..." --recreate
     Значения с пробелами - в кавычках, напр. для RoSBERTa:
       --overrides 'embedding.text_instruction="search_document:
       " embedding.query_instruction="search_query: " ...'

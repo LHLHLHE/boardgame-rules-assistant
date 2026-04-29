@@ -1,7 +1,7 @@
-from boardgame_rules_backend.connectors.qdrant import (QDRANT_COLLECTION,
-                                                       delete_points_by_rules_document_id,
+from boardgame_rules_backend.connectors.qdrant import (delete_points_by_rules_document_id,
                                                        delete_qdrant_collection_best_effort,
                                                        get_qdrant_async_client, get_qdrant_client,
+                                                       get_qdrant_collection_name,
                                                        get_qdrant_vector_store)
 from boardgame_rules_backend.connectors.redis import get_redis_client
 from boardgame_rules_backend.connectors.s3 import (delete_all_objects_under_prefix_best_effort,
@@ -26,7 +26,7 @@ __all__ = [
     "download_rules_file",
     "delete_s3_objects_best_effort",
     # Qdrant
-    "QDRANT_COLLECTION",
+    "get_qdrant_collection_name",
     "delete_points_by_rules_document_id",
     "delete_qdrant_collection_best_effort",
     "get_qdrant_client",

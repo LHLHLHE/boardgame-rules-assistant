@@ -41,6 +41,7 @@ def run_retriever_evaluation(
     dataset_hf_filename: str | None = None,
     top_k: int | None = None,
     limit: int | None = None,
+    time_retrieval: bool = False,
 ) -> dict[str, Any]:
     """Запускает оценку ретривера.
 
@@ -51,6 +52,7 @@ def run_retriever_evaluation(
         dataset_hf_filename: Имя файла в HF-репозитории.
         top_k: Число чанков для retriever (из cfg, если не задано).
         limit: Ограничение числа сэмплов.
+        time_retrieval: Добавить в retriever mean/std/p50/p95 задержки на вопрос (см. RetrieverEvaluator).
 
     Returns:
         Словарь: models (embedding), retriever (метрики), n_samples.
@@ -58,7 +60,7 @@ def run_retriever_evaluation(
     dataset = _load_eval_dataset(cfg, dataset_path, dataset_hf, dataset_hf_filename)
     retriever = Retriever(cfg)
     retriever_eval = RetrieverEvaluator(cfg=cfg, retriever=retriever, top_k=top_k)
-    retriever_metrics = retriever_eval.evaluate(dataset, limit=limit)
+    retriever_metrics = retriever_eval.evaluate(dataset, limit=limit, time_retrieval=time_retrieval)
     embedding_model = str(OmegaConf.select(
         cfg, "embedding.model", default="intfloat/multilingual-e5-base"
     ))

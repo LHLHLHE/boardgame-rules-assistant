@@ -1,3 +1,11 @@
 host: localhost
 port: 6333
 collection_name: boardgame_rules_chunk512
+hybrid:
+  enabled: false
+  # Отдельное имя для dense+sparse в Qdrant
+  collection_name: null
+  fastembed_sparse_model: Qdrant/bm25
+  batch_size: 64
+  dense_vector_name: null
+  sparse_vector_name: null

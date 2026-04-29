@@ -1,13 +1,14 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from boardgame_rules_bot.constants import (CALLBACK_ACTION_ASK, CALLBACK_ACTION_CANCEL,
-                                           CALLBACK_ACTION_DOWNLOAD_SOURCE)
+                                           CALLBACK_ACTION_DOWNLOAD_SOURCE, CALLBACK_ACTION_INFO)
 
 
 def build_start_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Задать вопрос", callback_data=CALLBACK_ACTION_ASK)],
+            [InlineKeyboardButton(text="Команды", callback_data=CALLBACK_ACTION_INFO)],
         ]
     )
 

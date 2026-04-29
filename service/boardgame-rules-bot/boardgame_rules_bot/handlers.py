@@ -10,8 +10,8 @@ from aiogram.types import (BufferedInputFile, CallbackQuery, InlineQuery, Inline
 from boardgame_rules_bot.backend import ask_question, download_rules_source, fetch_games
 from boardgame_rules_bot.config import settings
 from boardgame_rules_bot.constants import (CALLBACK_ACTION_ASK, CALLBACK_ACTION_CANCEL,
-                                           CALLBACK_ACTION_DOWNLOAD_SOURCE, HELP_BODY_TEXT,
-                                           INLINE_GAME_URL_PREFIX)
+                                           CALLBACK_ACTION_DOWNLOAD_SOURCE, CALLBACK_ACTION_INFO,
+                                           HELP_TEXT, INFO_TEXT, INLINE_GAME_URL_PREFIX)
 from boardgame_rules_bot.keyboards import (build_inline_search_keyboard, build_start_keyboard,
                                            build_waiting_question_keyboard)
 from boardgame_rules_bot.states import AskStates
@@ -38,7 +38,7 @@ async def show_ask_prompt(message: Message, state: FSMContext) -> None:
 
 async def show_cancelled(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer(HELP_BODY_TEXT, reply_markup=build_start_keyboard())
+    await message.answer(HELP_TEXT, reply_markup=build_start_keyboard())
 
 
 @router.message(Command("start"))
@@ -46,14 +46,19 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     await state.clear()
     name = message.from_user.first_name or "игрок"
     await message.answer(
-        f"Привет, {name}! 👋\n{HELP_BODY_TEXT}",
+        f"Привет, {name}! 👋\n{HELP_TEXT}",
         reply_markup=build_start_keyboard()
     )
 
 
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
-    await message.answer(HELP_BODY_TEXT)
+    await message.answer(HELP_TEXT)
+
+
+@router.message(Command("info"))
+async def cmd_info(message: Message) -> None:
+    await message.answer(INFO_TEXT)
 
 
 @router.message(Command("cancel"))
@@ -75,6 +80,13 @@ async def callback_ask(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     if callback.message:
         await show_ask_prompt(callback.message, state)
+
+
+@router.callback_query(F.data == CALLBACK_ACTION_INFO)
+async def callback_info(callback: CallbackQuery) -> None:
+    await callback.answer()
+    if callback.message:
+        await callback.message.answer(INFO_TEXT, reply_markup=build_start_keyboard())
 
 
 @router.callback_query(F.data == CALLBACK_ACTION_CANCEL)

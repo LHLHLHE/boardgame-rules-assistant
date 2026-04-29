@@ -1,0 +1,22 @@
+{
+  "experiment_id": "hybrid_weighted_20x20_a03",
+  "fusion": "weighted",
+  "dense_top_k": 20,
+  "sparse_top_k": 20,
+  "alpha": 0.3,
+  "models": {
+    "embedding": "intfloat/multilingual-e5-base"
+  },
+  "retriever": {
+    "recall_at_k": 0.8520833333333334,
+    "precision_at_k": 0.11699999999999995,
+    "map_at_k": 0.6389748677248677,
+    "ndcg_at_k": 0.7115689063675867,
+    "hit_rate": 0.93,
+    "mean_query_ms": 556.539719805005,
+    "std_query_ms": 33.26214345070408,
+    "p50_query_ms": 559.0410204895306,
+    "p95_query_ms": 600.4029955918668
+  },
+  "n_samples": 200
+}
