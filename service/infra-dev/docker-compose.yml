@@ -50,7 +50,7 @@ services:
     image: minio/minio:latest
     container_name: boardgame-minio
     restart: unless-stopped
-    command: server /data
+    command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}

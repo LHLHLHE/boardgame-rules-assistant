@@ -11,7 +11,7 @@ from boardgame_rules_backend.connectors import (delete_all_objects_under_prefix_
                                                 delete_points_by_rules_document_id,
                                                 delete_qdrant_collection_best_effort,
                                                 delete_s3_objects_best_effort, download_rules_file,
-                                                rules_storage_key, source_content_type,
+                                                processed_rules_key, source_content_type,
                                                 upload_rules_file, upload_source_file)
 from boardgame_rules_backend.connectors.s3 import RULES_S3_PREFIX
 from boardgame_rules_backend.exceptions import (EmptyFileError, GameNotFound,
@@ -214,7 +214,7 @@ class GameService:
             await self.game_repo.delete_rules_documents_for_game(game_id)
 
         doc_id = hashlib.sha256(content).hexdigest()
-        storage_path = rules_storage_key(doc_id, "txt")
+        storage_path = processed_rules_key(doc_id, "txt")
         source_storage_path, _ = await asyncio.to_thread(
             upload_source_file,
             content,
